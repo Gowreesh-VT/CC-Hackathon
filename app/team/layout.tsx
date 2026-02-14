@@ -10,7 +10,11 @@ export default async function TeamLayout({ children }: TeamLayoutProps) {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
 
-  if (role !== "team") {
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (role && role !== "team") {
     redirect("/login");
   }
 

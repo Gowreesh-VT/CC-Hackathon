@@ -10,7 +10,11 @@ export default async function JudgeLayout({ children }: JudgeLayoutProps) {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
 
-  if (role !== "judge") {
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (role && role !== "judge") {
     redirect("/login");
   }
 

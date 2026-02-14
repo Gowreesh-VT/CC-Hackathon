@@ -1,49 +1,20 @@
-"use client";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import LoginClient from "./LoginClient";
+import { connectDB } from "@/config/db";
+import User from "@/models/User";
 
-import { signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+export default async function Page() {
+  const session = await getServerSession(authOptions);
 
-export default function LoginPage() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-6 py-16">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>
-            Access your team space or administration console.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Team leaders use Google to sign in on behalf of the team. */}
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-medium">Team login</p>
-            <p className="text-sm text-muted-foreground">
-              Team leaders authenticate with a Google account to enter the team
-              dashboard.
-            </p>
-          </div>
-          {/* Admins and judges sign in with Google OAuth. */}
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-medium">Admin and judge access</p>
-            <p className="text-sm text-muted-foreground">
-              Judges and organizers use Google OAuth for secure access.
-            </p>
-          </div>
-          {/* Primary Google OAuth action card. */}
-          <div className="flex justify-start">
-            <Button onClick={() => signIn("google")}>
-              Continue with Google
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </main>
-  );
+  if (session?.user?.email) {
+    await connectDB();
+    const user = await User.findOne({ email: session.user.email }).lean();
+    if (user && user.role === "team") {
+      redirect("/team/dashboard");
+    }
+  }
+
+  return <LoginClient />;
 }
