@@ -15,7 +15,12 @@ type Props = {
   }) => void;
 };
 
-export default function SubmissionForm({ subtask, onFinalSubmitted, allowFileUpload, roundId }: Props) {
+export default function SubmissionForm({
+  subtask,
+  onFinalSubmitted,
+  allowFileUpload,
+  roundId,
+}: Props) {
   const [githubUrl, setGithubUrl] = useState("");
   const [docUrl, setDocUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -35,16 +40,29 @@ export default function SubmissionForm({ subtask, onFinalSubmitted, allowFileUpl
         fd.append("file", file);
         if (githubUrl) fd.append("githubLink", githubUrl);
         if (docUrl) fd.append("file_url", docUrl);
-        const res = await fetch("/api/team/submission", { method: "POST", body: fd });
+        const res = await fetch("/api/team/submission", {
+          method: "POST",
+          body: fd,
+        });
         const data = await res.json();
         if (res.ok) {
           setFinal(true);
-          onFinalSubmitted({ subtaskId: subtask.id, githubUrl, docUrl, fileName: file.name });
+          onFinalSubmitted({
+            subtaskId: subtask.id,
+            githubUrl,
+            docUrl,
+            fileName: file.name,
+          });
         } else {
           console.error(data);
         }
       } else {
-        const payload = { roundId: roundId ?? "", subtaskId: subtask.id, fileUrl: docUrl, githubLink: githubUrl };
+        const payload = {
+          roundId: roundId ?? "",
+          subtaskId: subtask.id,
+          fileUrl: docUrl,
+          githubLink: githubUrl,
+        };
         const res = await fetch("/api/team/submission", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -64,8 +82,6 @@ export default function SubmissionForm({ subtask, onFinalSubmitted, allowFileUpl
       setBusy(false);
     }
   }
-
-  
 
   return (
     <div className="mt-4 w-full max-w-2xl">

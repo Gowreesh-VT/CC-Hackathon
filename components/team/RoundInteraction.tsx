@@ -5,9 +5,17 @@ import type { SubtaskSummary } from "./SubtaskCard";
 import SubtaskCard from "./SubtaskCard";
 import SubmissionForm from "./SubmissionForm";
 
-type Props = { initial: SubtaskSummary[]; roundId?: string; allowFileUpload?: boolean };
+type Props = {
+  initial: SubtaskSummary[];
+  roundId?: string;
+  allowFileUpload?: boolean;
+};
 
-export default function RoundInteraction({ initial, roundId, allowFileUpload }: Props) {
+export default function RoundInteraction({
+  initial,
+  roundId,
+  allowFileUpload,
+}: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [submittedPayload, setSubmittedPayload] = useState<null | {
