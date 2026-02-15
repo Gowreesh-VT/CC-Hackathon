@@ -74,7 +74,7 @@ export default async function Page({}: Props) {
                 {currentRound ? `Round ${currentRound.round_number}` : "—"}
               </div>
               <div className="text-sm mt-2">
-                <span className="text-gray-300">Status: </span>
+                <span className="text-gray-300">Status:- </span>
                 <span
                   className={`px-2 py-1 rounded ${
                     currentRound?.is_active
