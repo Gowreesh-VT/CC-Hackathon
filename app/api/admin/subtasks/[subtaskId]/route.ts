@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 // PUT: Update a subtask
 export async function PUT(
   request: Request,
-  { params }: { params: { subtaskId: string } },
+  { params }: { params: Promise<{ subtaskId: string }> },
 ) {
-  const { subtaskId } = params;
+  const { subtaskId } = await params;
   const body = await request.json();
 
   return NextResponse.json({
@@ -17,9 +17,9 @@ export async function PUT(
 // DELETE: Remove a subtask
 export async function DELETE(
   request: Request,
-  { params }: { params: { subtaskId: string } },
+  { params }: { params: Promise<{ subtaskId: string }> },
 ) {
-  const { subtaskId } = params;
+  const { subtaskId } = await params;
 
   return NextResponse.json({
     message: `Subtask ${subtaskId} deleted successfully`,

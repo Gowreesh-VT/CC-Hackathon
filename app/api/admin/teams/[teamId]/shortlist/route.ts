@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 export async function POST(
   request: Request,
-  { params }: { params: { teamId: string } },
+  { params }: { params: Promise<{ teamId: string }> },
 ) {
-  const { teamId } = params;
+  const { teamId } = await params;
 
   return NextResponse.json({
     message: `Team ${teamId} has been shortlisted for the next round.`,

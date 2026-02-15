@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
-// PATCH: Lock the team's selection
 export async function PATCH(
   request: Request,
-  { params }: { params: { teamId: string } },
+  { params }: { params: Promise<{ teamId: string }> },
 ) {
-  const { teamId } = params;
+  const { teamId } = await params;
 
   return NextResponse.json({
     message: `Team ${teamId} selection has been LOCKED.`,

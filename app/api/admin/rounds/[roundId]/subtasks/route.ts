@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
-// GET: Fetch all subtasks for this round
 export async function GET(
   request: Request,
-  { params }: { params: { roundId: string } },
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
-  const { roundId } = params;
+  const { roundId } = await params;
 
   const dummySubtasks = [
     { id: "st1", title: "Build a Login Page", roundId: roundId },
@@ -15,13 +14,12 @@ export async function GET(
   return NextResponse.json(dummySubtasks);
 }
 
-// POST: Add a new subtask to this round
 export async function POST(
   request: Request,
-  { params }: { params: { roundId: string } },
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
-  const { roundId } = params;
-  const body = await request.json(); // Expecting { title, description }
+  const { roundId } = await params;
+  const body = await request.json();
 
   return NextResponse.json(
     {
