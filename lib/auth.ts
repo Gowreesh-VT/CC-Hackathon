@@ -14,13 +14,8 @@ if (!googleClientId || !googleClientSecret) {
 const clientId = googleClientId || "dummy_client_id";
 const clientSecret = googleClientSecret || "dummy_client_secret";
 
-// Mock function to determine role based on email
-// In a real application, you would fetch this from your database
-const getRoleForEmail = (email: string): "admin" | "judge" | "team" => {
-  if (email.includes("admin") || email.endsWith("@org.admin")) return "admin";
-  if (email.includes("judge") || email.endsWith("@org.judge")) return "judge";
-  return "team"; // Default role
-};
+import User from "@/models/User";
+import { connectDB } from "@/config/db";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -36,7 +31,18 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user && user.email) {
-        token.role = getRoleForEmail(user.email);
+        await connectDB();
+        const dbUser = await User.findOne({ email: user.email });
+
+        if (dbUser) {
+          token.role = dbUser.role;
+        } else {
+          // Default role for new users causing them to be 'team' or just guest?
+          // For now, let's default to "team" but they won't be in DB yet until they sign up properly? 
+          // Or we rely on the specific seed users. 
+          // If we want to allow auto-signup as 'team', we could do it here or just assign a default role in token.
+          token.role = "team";
+        }
       }
       return token;
     },

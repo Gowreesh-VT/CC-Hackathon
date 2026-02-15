@@ -1,11 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 type Role = "team" | "judge" | "admin";
 
 export default function LoginPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role) {
+      if (session.user.role === "admin") {
+        router.push("/admin/judges");
+      } else if (session.user.role === "judge") {
+        router.push("/judge");
+      } else if (session.user.role === "team") {
+        router.push("/team/dashboard");
+      }
+    }
+  }, [status, session, router]);
+
   // Default role = Team (as agreed)
   const [selectedRole, setSelectedRole] = useState<Role>("team");
 
@@ -92,15 +116,14 @@ export default function LoginPage() {
 
             <Button
               size="lg"
-              className="mt-2 transition-colors duration-200 hover:bg-blue-600 hover:text-white"
+              className="mt-2 w-full transition-colors duration-200 hover:bg-blue-600 hover:text-white"
               onClick={() => signIn("google")}
             >
               {roleContent[selectedRole].buttonText}
             </Button>
           </div>
-
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }
