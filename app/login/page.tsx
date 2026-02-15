@@ -2,14 +2,6 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type Role = "team" | "judge" | "admin";
 
@@ -106,8 +98,9 @@ export default function LoginPage() {
               {roleContent[selectedRole].buttonText}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+
+        </div>
+      </div>
     </main>
   );
 }
