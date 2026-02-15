@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { AdminShell } from "@/components/admin/AdminShell";
+import SidebarLayout from "@/components/sidebar-layout";
 
 type AdminLayoutProps = {
   children: React.ReactNode;
@@ -15,5 +15,5 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return <SidebarLayout>{children}</SidebarLayout>;
 }

@@ -1,10 +1,16 @@
+
 import mongoose from "mongoose"
 
 const MONGODB_URI = process.env.MONGODB_URI as string
 
 if (!MONGODB_URI) {
-  throw new Error("Please define MONGODB_URI in .env.local")
+  console.warn(
+    "Please define the MONGODB_URI environment variable inside .env.local",
+  );
 }
+
+// Fallback to avoid build errors
+const uri = MONGODB_URI || "mongodb://localhost:27017/dummy";
 
 let cached = (global as any).mongoose
 
@@ -18,7 +24,7 @@ export async function connectDB(): Promise<typeof mongoose> {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(uri, {
       dbName: "cc_hackathon",
       bufferCommands: false,
     })
