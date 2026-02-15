@@ -1,9 +1,4 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import LoginClient from "./LoginClient";
-import { connectDB } from "@/config/db";
-import User from "@/models/User";
+"use client";
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
@@ -48,7 +43,7 @@ export default function LoginPage() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-center text-3xl font-bold">
-          Sign in
+            Sign in
           </CardTitle>
 
           <CardDescription className="text-center">
@@ -75,17 +70,17 @@ export default function LoginPage() {
                   You can add an <img /> or icon here later if needed 
                 */}
                 <div className="flex items-center justify-center gap-2">
-                <img
-                  src={`/login_icons/${role}.svg`}
-                  alt=""
-                  className="h-5 w-5 invert opacity-80"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                  }}
-                />
-                <p className="capitalize">{role}</p>
-              </div>
-
+                  <img
+                    src={`/login_icons/${role}.svg`}
+                    alt=""
+                    className="h-5 w-5 invert opacity-80"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display =
+                        "none";
+                    }}
+                  />
+                  <p className="capitalize">{role}</p>
+                </div>
               </button>
             ))}
           </div>
