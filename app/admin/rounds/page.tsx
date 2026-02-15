@@ -20,6 +20,14 @@ import { Plus, ChevronRight, ListOrdered } from "lucide-react";
 import { mockRounds } from "@/lib/mock/adminMockData";
 import { cn } from "@/lib/utils";
 
+// Define round type
+type Round = {
+  id: string;
+  name: string;
+  status: 'completed' | 'active' | 'pending';
+  submissions: number;
+};
+
 export default function AdminRoundsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newRoundName, setNewRoundName] = useState("");

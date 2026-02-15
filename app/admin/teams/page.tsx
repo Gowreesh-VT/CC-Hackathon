@@ -30,6 +30,20 @@ import { mockTeams } from "@/lib/mock/adminMockData";
 import { cn } from "@/lib/utils";
 import type { TeamDetail } from "@/lib/redux/api/types";
 
+// Define team type
+type Team = {
+  id: string;
+  name: string;
+  score: number;
+  scoreTrend: 'up' | 'down' | 'neutral';
+  submissionStatus: 'submitted' | 'in-progress' | 'pending';
+  currentRound: string;
+  track: string;
+  isLocked: boolean;
+  isShortlisted: boolean;
+  isEliminated: boolean;
+};
+
 export default function AdminTeamsPage() {
   const [teams, setTeams] = useState<TeamDetail[]>(mockTeams);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
