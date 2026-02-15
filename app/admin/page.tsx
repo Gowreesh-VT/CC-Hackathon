@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,30 +25,115 @@ import { mockDashboard, mockRounds } from "@/lib/mock/adminMockData";
 import { cn } from "@/lib/utils";
 
 export default function AdminDashboardPage() {
-  const [selectedRoundId, setSelectedRoundId] = useState<string | null>(
-    mockDashboard.currentRoundId
-  );
-  const [submissionToggled, setSubmissionToggled] = useState(
-    mockDashboard.submissionEnabled
-  );
+  const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
+  const [submissionToggled, setSubmissionToggled] = useState(false);
+  const [stats, setStats] = useState<any>(mockDashboard);
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleStartRound = () => {
-    if (!selectedRoundId) return;
-    // TODO: useStartRoundMutation() when backend is ready
-    console.log("Start round", selectedRoundId);
+  // Fetch Stats and Rounds
+  const fetchData = async () => {
+     try {
+        const [statsRes, roundsRes] = await Promise.all([
+           fetch("/api/admin/dashboard"),
+           fetch("/api/admin/rounds")
+        ]);
+
+        if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            setStats(statsData);
+            if (statsData.currentRound) {
+               // Only set if not already set by user interaction
+               if (!selectedRoundId) setSelectedRoundId(statsData.currentRound.id);
+            }
+        }
+        
+        if (roundsRes.ok) {
+            const roundsData = await roundsRes.json();
+            setRounds(roundsData);
+            
+            // Sync toggle state with selected round
+            if (selectedRoundId) {
+                const r = roundsData.find((rd: any) => rd._id === selectedRoundId);
+                if (r) setSubmissionToggled(r.submission_enabled);
+            }
+        }
+     } catch (error) {
+         console.error("Error fetching admin data:", error);
+     } finally {
+         setLoading(false);
+     }
   };
 
-  const handleStopRound = () => {
+  useEffect(() => {
+     fetchData();
+  }, []);
+
+  // Update toggle when round selection changes
+  useEffect(() => {
+     if (selectedRoundId && rounds.length > 0) {
+        const r = rounds.find((rd: any) => rd._id === selectedRoundId);
+        if (r) setSubmissionToggled(r.submission_enabled);
+     }
+  }, [selectedRoundId, rounds]);
+
+  const handleStartRound = async () => {
     if (!selectedRoundId) return;
-    // TODO: useStopRoundMutation() when backend is ready
-    console.log("Stop round", selectedRoundId);
+    try {
+        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' })
+        });
+        if (res.ok) {
+            alert("Round started successfully");
+            fetchData();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to start round");
+    }
   };
 
-  const handleToggleSubmission = (checked: boolean) => {
+  const handleStopRound = async () => {
+    if (!selectedRoundId) return;
+    try {
+        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'stop' })
+        });
+        if (res.ok) {
+            alert("Round stopped successfully");
+            fetchData();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to stop round");
+    }
+  };
+
+  const handleToggleSubmission = async (checked: boolean) => {
     setSubmissionToggled(checked);
     if (!selectedRoundId) return;
-    // TODO: useToggleRoundSubmissionMutation() when backend is ready
-    console.log("Toggle submission", selectedRoundId, checked);
+    
+    try {
+        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'toggle-submission' })
+        });
+        if (res.ok) {
+            fetchData(); // Refresh to ensure sync
+        } else {
+             setSubmissionToggled(!checked); // Revert on failure
+             alert("Failed to toggle submission");
+        }
+    } catch (e) {
+        console.error(e);
+        setSubmissionToggled(!checked);
+        alert("Failed to toggle submission");
+    }
   };
 
   return (
@@ -78,7 +163,7 @@ export default function AdminDashboardPage() {
         <CardContent>
           <div className="flex flex-wrap items-baseline gap-4">
             <span className="text-3xl font-bold tabular-nums text-foreground">
-              {mockDashboard.totalTeams}
+              {stats.totalTeams}
             </span>
             <span className="text-muted-foreground">total teams</span>
           </div>
@@ -100,14 +185,14 @@ export default function AdminDashboardPage() {
             <Clock className="size-5 text-muted-foreground" />
             Current round status
           </CardTitle>
-          {mockDashboard.currentRound && (
+          {stats.currentRound && (
             <Badge
               variant={
-                mockDashboard.roundStatus === "active" ? "default" : "secondary"
+                stats.roundStatus === "active" ? "default" : "secondary"
               }
               className="mt-2 w-fit"
             >
-              {mockDashboard.currentRound.name}
+              {stats.currentRound.name}
             </Badge>
           )}
         </CardHeader>
@@ -119,7 +204,7 @@ export default function AdminDashboardPage() {
                 <span className="text-sm font-medium">Submissions</span>
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {mockDashboard.submissionsCount}
+                {stats.submissionsCount}
               </p>
             </div>
             <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
@@ -128,7 +213,7 @@ export default function AdminDashboardPage() {
                 <span className="text-sm font-medium">Pending evaluation</span>
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {mockDashboard.pendingEvaluationCount}
+                {stats.pendingEvaluationCount}
               </p>
             </div>
           </div>
@@ -165,9 +250,9 @@ export default function AdminDashboardPage() {
                   <SelectValue placeholder="Select a round" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockRounds.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name ?? `Round ${r.round_number ?? r.id}`}
+                  {rounds.map((r) => (
+                    <SelectItem key={r._id} value={r._id}>
+                      {`Round ${r.round_number} ${r.is_active ? '(Active)' : ''}`}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,13 +30,58 @@ type Round = {
 
 export default function AdminRoundsPage() {
   const [createOpen, setCreateOpen] = useState(false);
-  const [newRoundName, setNewRoundName] = useState("");
+  const [roundNumber, setRoundNumber] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleCreateRound = () => {
-    // TODO: useCreateRoundMutation() when backend is ready
-    console.log("Create round", newRoundName);
-    setNewRoundName("");
-    setCreateOpen(false);
+  // Fetch Rounds
+  const fetchRounds = async () => {
+    try {
+      const res = await fetch("/api/admin/rounds");
+      if (res.ok) {
+        const data = await res.json();
+        setRounds(data);
+      }
+    } catch (error) {
+      console.error("Error fetching rounds:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRounds();
+  }, []);
+
+  const handleCreateRound = async () => {
+    if (!roundNumber) return;
+
+    try {
+      const res = await fetch("/api/admin/rounds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          round_number: parseInt(roundNumber),
+          instructions,
+          // name is not in schema but maybe we interpret "Round X"
+        }),
+      });
+
+      if (res.ok) {
+        alert("Round created successfully");
+        setCreateOpen(false);
+        setRoundNumber("");
+        setInstructions("");
+        fetchRounds();
+      } else {
+        const err = await res.json();
+        alert(`Failed to create round: ${err.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to create round");
+    }
   };
 
   return (
@@ -72,18 +117,28 @@ export default function AdminRoundsPage() {
               <DialogHeader>
                 <DialogTitle>Create new round</DialogTitle>
                 <DialogDescription>
-                  Add a new round to the event. You can set subtasks and
-                  controls from the round detail page.
+                  Enter the round number and optional instructions.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="round-name">Round name</Label>
+                  <Label htmlFor="round-number">Round Number</Label>
                   <Input
-                    id="round-name"
-                    placeholder="e.g. Round 2"
-                    value={newRoundName}
-                    onChange={(e) => setNewRoundName(e.target.value)}
+                    id="round-number"
+                    type="number"
+                    placeholder="e.g. 2"
+                    value={roundNumber}
+                    onChange={(e) => setRoundNumber(e.target.value)}
+                    className="rounded-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="instructions">Instructions (Optional)</Label>
+                  <Input
+                    id="instructions"
+                    placeholder="Brief instructions..."
+                    value={instructions}
+                    onChange={(e) => setInstructions(e.target.value)}
                     className="rounded-lg"
                   />
                 </div>
@@ -98,7 +153,7 @@ export default function AdminRoundsPage() {
                 </Button>
                 <Button
                   onClick={handleCreateRound}
-                  disabled={!newRoundName.trim()}
+                  disabled={!roundNumber}
                   className="rounded-xl"
                 >
                   Create
@@ -109,38 +164,44 @@ export default function AdminRoundsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {mockRounds.map((round) => (
-              <Link
-                key={round.id}
-                href={`/admin/round/${round.id}`}
-                className={cn(
-                  "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-muted/20 p-4 transition-all",
-                  "hover:border-primary/30 hover:bg-muted/40 hover:shadow-md",
-                  "focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring"
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-medium text-foreground">
-                    {round.name ?? `Round ${round.round_number ?? round.id}`}
-                  </span>
-                  <Badge
-                    variant={
-                      round.status === "active"
-                        ? "default"
-                        : round.status === "closed"
-                          ? "secondary"
-                          : "outline"
-                    }
+            {loading ? (
+                <p className="text-sm text-muted-foreground">Loading rounds...</p>
+            ) : rounds.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No rounds found. Create one to get started.</p>
+            ) : (
+                rounds.map((round) => (
+                  <Link
+                    key={round._id}
+                    href={`/admin/rounds/${round._id}`}
+                    className={cn(
+                      "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-muted/20 p-4 transition-all",
+                      "hover:border-primary/30 hover:bg-muted/40 hover:shadow-md",
+                      "focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring"
+                    )}
                   >
-                    {round.status ?? "draft"}
-                  </Badge>
-                  {round.submission_enabled && (
-                    <Badge variant="secondary">Submissions on</Badge>
-                  )}
-                </div>
-                <ChevronRight className="size-5 text-muted-foreground" />
-              </Link>
-            ))}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="font-medium text-foreground">
+                        {`Round ${round.round_number}`}
+                      </span>
+                      <Badge
+                        variant={
+                          round.is_active
+                            ? "default"
+                            : round.end_time && new Date() > new Date(round.end_time)
+                              ? "secondary" // Passed/Closed
+                              : "outline" // Upcoming/Inactive
+                        }
+                      >
+                         {round.is_active ? "active" : "inactive"}
+                      </Badge>
+                      {round.submission_enabled && (
+                        <Badge variant="secondary">Submissions on</Badge>
+                      )}
+                    </div>
+                    <ChevronRight className="size-5 text-muted-foreground" />
+                  </Link>
+                ))
+            )}
           </div>
         </CardContent>
       </Card>

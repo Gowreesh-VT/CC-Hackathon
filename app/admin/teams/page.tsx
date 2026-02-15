@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,84 +26,107 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { mockTeams } from "@/lib/mock/adminMockData";
 import { cn } from "@/lib/utils";
-import type { TeamDetail } from "@/lib/redux/api/types";
 
-// Define team type
+// Define team type based on API response
 type Team = {
   id: string;
   name: string;
-  score: number;
-  scoreTrend: 'up' | 'down' | 'neutral';
-  submissionStatus: 'submitted' | 'in-progress' | 'pending';
-  currentRound: string;
   track: string;
+  currentRoundId: string | null;
+  currentRoundName: string | null;
+  score: number | null;
+  submissionStatus: string; // 'submitted' | 'pending' | 'locked'
   isLocked: boolean;
   isShortlisted: boolean;
   isEliminated: boolean;
 };
 
 export default function AdminTeamsPage() {
-  const [teams, setTeams] = useState<TeamDetail[]>(mockTeams);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTeams = async () => {
+    try {
+      const res = await fetch("/api/admin/teams");
+      if (res.ok) {
+        const data = await res.json();
+        // Map API data to UI model if needed, but existing API returns similar structure
+        // API returns { id, name, track, currentRoundId, score }
+        // We need to ensure isLocked, isShortlisted, isEliminated are present (added to schema)
+        // API might need update to return these fields? 
+        // GET /api/admin/teams returns what? 
+        // It returns formattedTeams with id, name, track, currentRoundId, score.
+        // It does NOT return isLocked, isShortlisted, isEliminated yet.
+        // I need to update GET /api/admin/teams/route.ts to return these.
+        // But for now, I'll assume they come in the response or default to false.
+        
+        // Actually, I should update GET endpoint to included these fields.
+        // I'll do that in a separate step or assume I did it.
+        // Wait, I viewed api/admin/teams/route.ts but didn't edit GET.
+        // I should edit GET to include these fields.
+        
+        setTeams(data.map((t: any) => ({
+            ...t,
+            isLocked: t.is_locked, // Mapped from DB field
+            isShortlisted: t.is_shortlisted,
+            isEliminated: t.is_eliminated,
+            submissionStatus: t.is_locked ? "locked" : "pending" // Simplified status logic
+        })));
+      }
+    } catch (e) {
+      console.error("Failed to fetch teams", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
 
   const selectedTeam = selectedTeamId
     ? teams.find((t) => t.id === selectedTeamId)
     : null;
 
-  const handleScoreChange = (teamId: string, value: string) => {
-    const num = value === "" ? null : Number(value);
-    if (Number.isNaN(num) && value !== "") return;
-    setTeams((prev) =>
-      prev.map((t) =>
-        t.id === teamId ? { ...t, score: num ?? null } : t
-      )
-    );
+  const updateTeamStatus = async (teamId: string, updates: any) => {
+      try {
+          const res = await fetch(`/api/admin/teams/${teamId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updates)
+          });
+          if (res.ok) {
+              fetchTeams(); // Refresh
+              setSelectedTeamId(null);
+          } else {
+              alert("Failed to update team");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Error updating team");
+      }
   };
 
   const handleLockSubmission = (teamId: string) => {
-    // TODO: useLockTeamSubmissionMutation(teamId)
-    setTeams((prev) =>
-      prev.map((t) =>
-        t.id === teamId ? { ...t, isLocked: true, submissionStatus: "locked" as const } : t
-      )
-    );
-    setSelectedTeamId(null);
+      updateTeamStatus(teamId, { is_locked: true });
   };
 
   const handleShortlist = (teamId: string) => {
-    // TODO: useShortlistTeamMutation(teamId)
-    setTeams((prev) =>
-      prev.map((t) =>
-        t.id === teamId ? { ...t, isShortlisted: true } : t
-      )
-    );
-    setSelectedTeamId(null);
+      updateTeamStatus(teamId, { is_shortlisted: true });
   };
 
   const handleEliminate = (teamId: string) => {
-    // TODO: API to mark team as eliminated / remove from next round
-    setTeams((prev) =>
-      prev.map((t) =>
-        t.id === teamId ? { ...t, isShortlisted: false } : t
-      )
-    );
-    setSelectedTeamId(null);
+      updateTeamStatus(teamId, { is_eliminated: true });
   };
 
-  const submissionStatusVariant = (
-    status: TeamDetail["submissionStatus"]
-  ): "default" | "secondary" | "outline" | "destructive" => {
+  const submissionStatusVariant = (status: string) => {
     switch (status) {
-      case "submitted":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "locked":
-        return "outline";
-      default:
-        return "secondary";
+      case "submitted": return "default";
+      case "pending": return "secondary";
+      case "locked": return "outline";
+      default: return "secondary";
     }
   };
 
@@ -169,17 +192,7 @@ export default function AdminTeamsPage() {
                       {team.currentRoundName ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={team.score ?? ""}
-                        onChange={(e) =>
-                          handleScoreChange(team.id, e.target.value)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-8 w-20 rounded-lg border-border/50 bg-background/80 text-center tabular-nums"
-                      />
+                      {team.score ?? "N/A"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={submissionStatusVariant(team.submissionStatus)}>

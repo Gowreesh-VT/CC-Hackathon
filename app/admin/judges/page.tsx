@@ -23,23 +23,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Gavel, Plus, UserPlus, Users } from "lucide-react";
-import { mockJudges, mockTeams, mockRounds } from "@/lib/mock/adminMockData";
+import { Gavel, Plus, UserPlus, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Judge } from "@/lib/redux/api/types";
-
-// Define types
-type Judge = {
-  id: string;
-  name: string;
-  email: string;
-  assignedTeams: string[];
-};
-
-type Team = {
-  id: string;
-  name: string;
-};
+import type { Judge, TeamDetail } from "@/lib/redux/api/types";
+import {
+  useGetJudgesQuery,
+  useGetTeamsQuery,
+  useCreateJudgeMutation,
+  useDeleteJudgeMutation,
+  useAssignTeamsToJudgeMutation,
+} from "@/lib/redux/api/adminApi";
+import { toast } from "sonner";
 
 export default function AdminJudgesPage() {
   // State management
@@ -48,26 +42,17 @@ export default function AdminJudgesPage() {
   const [isAssigningTeams, setIsAssigningTeams] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
-  // Mock judges data
-  const [judges, setJudges] = useState<Judge[]>([
-    { id: "judge-1", name: "Alex Kim", email: "alex@example.com", assignedTeams: ["team-alpha", "team-beta", "team-gamma"] },
-    { id: "judge-2", name: "Sarah Chen", email: "sarah@example.com", assignedTeams: ["team-delta"] },
-  ]);
-
-  // Mock available teams
-  const [availableTeams] = useState<Team[]>([
-    { id: "team-alpha", name: "Team Alpha" },
-    { id: "team-beta", name: "Team Beta" },
-    { id: "team-gamma", name: "Team Gamma" },
-    { id: "team-delta", name: "Team Delta" },
-    { id: "team-epsilon", name: "Team Epsilon" },
-  ]);
+  // RTK Query hooks
+  const { data: judges = [], isLoading: isLoadingJudges } = useGetJudgesQuery();
+  const { data: teams = [], isLoading: isLoadingTeams } = useGetTeamsQuery();
+  const [createJudge] = useCreateJudgeMutation();
+  const [deleteJudge] = useDeleteJudgeMutation();
+  const [assignTeams] = useAssignTeamsToJudgeMutation();
 
   // Handle add judge
   const handleAddJudge = async () => {
     setIsAddingJudge(true);
     try {
-      // In production, this would open a modal/form
       const judgeName = prompt("Enter judge name:");
       const judgeEmail = prompt("Enter judge email:");
       
@@ -75,22 +60,12 @@ export default function AdminJudgesPage() {
         setIsAddingJudge(false);
         return;
       }
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const newJudge: Judge = {
-        id: `judge-${judges.length + 1}`,
-        name: judgeName,
-        email: judgeEmail,
-        assignedTeams: []
-      };
-      
-      setJudges([...judges, newJudge]);
-      console.log("Added judge:", newJudge);
-      alert(`Judge ${judgeName} added successfully!`);
+      await createJudge({ name: judgeName, email: judgeEmail }).unwrap();
+      toast.success(`Judge ${judgeName} added successfully!`);
     } catch (error) {
       console.error("Failed to add judge:", error);
-      alert("Failed to add judge");
+      toast.error("Failed to add judge");
     } finally {
       setIsAddingJudge(false);
     }
@@ -104,60 +79,68 @@ export default function AdminJudgesPage() {
   // Handle assign teams
   const handleAssignTeams = () => {
     if (!selectedJudgeId) {
-      alert("Please select a judge first");
+      toast.error("Please select a judge first");
       return;
     }
     setShowAssignmentModal(true);
   };
 
   // Handle team assignment toggle
-  const handleToggleTeamAssignment = async (teamId: string) => {
-    if (!selectedJudgeId) return;
-
-    setIsAssigningTeams(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setJudges(prev => prev.map(judge => {
-        if (judge.id === selectedJudgeId) {
-          const hasTeam = judge.assignedTeams.includes(teamId);
-          return {
-            ...judge,
-            assignedTeams: hasTeam
-              ? judge.assignedTeams.filter(t => t !== teamId)
-              : [...judge.assignedTeams, teamId]
-          };
-        }
-        return judge;
-      }));
-      
-      console.log("Toggled team assignment:", teamId, "for judge:", selectedJudgeId);
-    } catch (error) {
-      console.error("Failed to assign team:", error);
-      alert("Failed to assign team");
-    } finally {
-      setIsAssigningTeams(false);
-    }
+  const selectedJudge = judges.find(j => j.id === selectedJudgeId);
+  const [tempAssignedTeams, setTempAssignedTeams] = useState<string[]>([]);
+  
+  // When opening modal, initialize temp state
+  const openAssignmentModal = () => {
+      if (selectedJudge) {
+          setTempAssignedTeams(selectedJudge.assignedTeams || []);
+          setShowAssignmentModal(true);
+      }
   };
+
+  const handleToggleTeamSelection = (teamId: string) => {
+      setTempAssignedTeams(prev => 
+          prev.includes(teamId) 
+            ? prev.filter(id => id !== teamId)
+            : [...prev, teamId]
+      );
+  };
+
+  const saveAssignments = async () => {
+      if (!selectedJudgeId) return;
+      setIsAssigningTeams(true);
+      try {
+          await assignTeams({ 
+              judgeId: selectedJudgeId, 
+              teamIds: tempAssignedTeams, 
+              roundId: ""
+          }).unwrap();
+          toast.success("Assignments updated successfully");
+          setShowAssignmentModal(false);
+      } catch (error) {
+          console.error("Failed to assign teams:", error);
+          toast.error("Failed to assign teams");
+      } finally {
+          setIsAssigningTeams(false);
+      }
+  };
+
 
   // Handle remove judge
   const handleRemoveJudge = async (judgeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
     const judge = judges.find(j => j.id === judgeId);
-    const confirmed = window.confirm(`Remove ${judge?.name} from the judge panel?`);
-    if (!confirmed) return;
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setJudges(prev => prev.filter(j => j.id !== judgeId));
-      if (selectedJudgeId === judgeId) {
-        setSelectedJudgeId(null);
-      }
-      console.log("Removed judge:", judgeId);
-    } catch (error) {
-      console.error("Failed to remove judge:", error);
-      alert("Failed to remove judge");
+    if(confirm(`Remove ${judge?.name} from the judge panel?`)) {
+        try {
+            await deleteJudge(judgeId).unwrap();
+            if (selectedJudgeId === judgeId) {
+                setSelectedJudgeId(null);
+            }
+            toast.success("Judge removed successfully");
+        } catch (error) {
+            console.error("Failed to remove judge:", error);
+            toast.error("Failed to remove judge");
+        }
     }
   };
 
@@ -167,11 +150,17 @@ export default function AdminJudgesPage() {
   };
 
   // Get assigned team names
-  const getAssignedTeamNames = (teamIds: string[]) => {
-    return teamIds.map(id => availableTeams.find(t => t.id === id)?.name || id);
+  const getAssignedTeamNames = (teamIds: string[] = []) => {
+    return teamIds.map(id => teams.find(t => t.id === id)?.name || id);
   };
 
-  const selectedJudge = judges.find(j => j.id === selectedJudgeId);
+  if (isLoadingJudges || isLoadingTeams) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-slate-950">
+              <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
+          </div>
+      );
+  }
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-slate-950">
@@ -295,7 +284,7 @@ export default function AdminJudgesPage() {
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
-                              <span className="text-2xl font-bold text-white">{judge.assignedTeams.length}</span>
+                              <span className="text-2xl font-bold text-white">{judge.assignedTeams?.length || 0}</span>
                               <span className="text-xs font-mono text-slate-500">teams</span>
                             </div>
                           </td>
@@ -352,7 +341,7 @@ export default function AdminJudgesPage() {
                 </div>
 
                 <button
-                  onClick={handleAssignTeams}
+                  onClick={openAssignmentModal}
                   disabled={!selectedJudgeId}
                   className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2 text-xs font-semibold text-white transition-all duration-300 hover:border-violet-500/50 hover:bg-slate-800/70 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-700"
                 >
@@ -374,7 +363,7 @@ export default function AdminJudgesPage() {
                 <div className="space-y-3">
                   <div className="text-xs font-mono text-slate-400 tracking-wider mb-2">CURRENT ASSIGNMENTS</div>
                   <div className="flex flex-wrap gap-2">
-                    {selectedJudge.assignedTeams.length > 0 ? (
+                    {selectedJudge.assignedTeams && selectedJudge.assignedTeams.length > 0 ? (
                       getAssignedTeamNames(selectedJudge.assignedTeams).map((teamName, index) => (
                         <span 
                           key={index}
@@ -421,13 +410,13 @@ export default function AdminJudgesPage() {
 
                   {/* Team Selection */}
                   <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {availableTeams.map((team) => {
-                      const isAssigned = selectedJudge.assignedTeams.includes(team.id);
+                    {teams.map((team) => {
+                      const isAssigned = tempAssignedTeams.includes(team.id);
                       
                       return (
                         <button
                           key={team.id}
-                          onClick={() => handleToggleTeamAssignment(team.id)}
+                          onClick={() => handleToggleTeamSelection(team.id)}
                           disabled={isAssigningTeams}
                           className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
                             isAssigned 
@@ -440,7 +429,7 @@ export default function AdminJudgesPage() {
                               isAssigned ? 'bg-cyan-500/20 border border-cyan-500/40' : 'bg-slate-700/50'
                             }`}>
                               <span className={`text-sm font-bold ${isAssigned ? 'text-cyan-400' : 'text-slate-400'}`}>
-                                {team.name.charAt(5)}
+                                {team.name.charAt(0)}
                               </span>
                             </div>
                             <span className={`font-semibold ${isAssigned ? 'text-cyan-400' : 'text-white'}`}>
@@ -461,13 +450,14 @@ export default function AdminJudgesPage() {
                   {/* Modal Footer */}
                   <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-800">
                     <div className="text-xs font-mono text-slate-500">
-                      {selectedJudge.assignedTeams.length} of {availableTeams.length} teams assigned
+                      {tempAssignedTeams.length} of {teams.length} teams assigned
                     </div>
                     <button
-                      onClick={() => setShowAssignmentModal(false)}
-                      className="rounded-lg bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 px-6 py-2 text-sm font-semibold text-white transition-all duration-300 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98]"
+                      onClick={saveAssignments}
+                      disabled={isAssigningTeams}
+                      className="rounded-lg bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 px-6 py-2 text-sm font-semibold text-white transition-all duration-300 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Done
+                      {isAssigningTeams ? <Loader2 className="w-4 h-4 animate-spin" /> : "Done"}
                     </button>
                   </div>
                 </div>
