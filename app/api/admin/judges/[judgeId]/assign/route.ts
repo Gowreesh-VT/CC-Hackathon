@@ -24,16 +24,19 @@ export async function POST(
     }
 
     // Determine roundId if not provided. logic: use active round
+    // Determine roundId if not provided. logic: use active round
+    // Determine roundId if not provided. logic: use active round
     let rId = roundId;
     if (!rId) {
+      const Round = (await import("@/models/Round")).default;
       const activeRound = await Round.findOne({ is_active: true });
       if (activeRound) {
         rId = activeRound._id;
-      } else {
-        // fallback or error? For now, if no active round, we might just leave it null or error
-        // Check if JudgeAssignment schema requires round_id. 
-        // In models/JudgeAssignment.ts it's ref: "Round", likely optional but good to have
       }
+    }
+
+    if (!rId) {
+      return NextResponse.json({ error: "Round ID is required or no active round found" }, { status: 400 });
     }
 
     // 1. Remove existing assignments for this judge (and round if applicable)
@@ -47,7 +50,21 @@ export async function POST(
     // The current UI seems to be global assignment or undefined round.
     // Let's assume global for now or just wipe previous assignments.
 
-    await JudgeAssignment.deleteMany({ judge_id: judgeId });
+    // 1. Remove existing assignments for this judge AND this round
+    // This preserves assignments for other rounds (e.g., Round 1 history)
+    if (rId) {
+      await JudgeAssignment.deleteMany({ judge_id: judgeId, round_id: rId });
+    } else {
+      // Fallback behavior: if no round specified, maybe clear all? 
+      // Or better safe than sorry: require round ID.
+      // But for backward compat with whatever frontend sends, if rId is null, we might be in trouble.
+      // Assuming rId is always resolved above.
+
+      // If rId is null, it means we couldn't find an active round or provided one.
+      // We should probably error out or default to clearing "global" assignments if that concept exists.
+      // Current logic allows rId to be null.
+      await JudgeAssignment.deleteMany({ judge_id: judgeId, round_id: null });
+    }
 
     // 2. Create new assignments
     if (teamIds.length > 0) {

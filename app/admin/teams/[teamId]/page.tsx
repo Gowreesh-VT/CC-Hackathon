@@ -1,50 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, Github, FileText, Lock, UserX, AlertTriangle } from "lucide-react";
+import { useGetTeamDetailsQuery } from "@/lib/redux/api/adminApi";
 
 export default function TeamDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const teamId = params.teamId as string;
 
-    const [team, setTeam] = useState<any>(null);
-    const [history, setHistory] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: details, isLoading } = useGetTeamDetailsQuery(teamId);
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            try {
-                const res = await fetch(`/api/admin/teams/${teamId}/details`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setTeam(data.team);
-                    setHistory(data.history);
-                }
-            } catch (error) {
-                console.error("Failed to fetch team details", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    if (isLoading) return <div className="p-8">Loading team details...</div>;
+    if (!details || !details.team) return <div className="p-8">Team not found</div>;
 
-        if (teamId) fetchDetails();
-    }, [teamId]);
+    const { team, history } = details;
 
     const getStatusVariant = (status: string) => {
         switch(status) {
-            case "Submitted": return "default"; // green-ish usually or default primary
-            case "Active": return "secondary"; // gray
+            case "Submitted": return "default";
+            case "Active": return "secondary";
             default: return "outline";
         }
     };
-
-    if (loading) return <div className="p-8">Loading team details...</div>;
-    if (!team) return <div className="p-8">Team not found</div>;
 
     return (
         <div className="space-y-6">
@@ -84,7 +65,7 @@ export default function TeamDetailsPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {history.map((round) => (
+                                    {history.map((round: any) => (
                                         <tr key={round.round_id} className="border-b border-gray-700 bg-gray-800 odd:bg-gray-900">
                                             <th scope="row" className="px-6 py-4 font-medium text-white whitespace-nowrap">
                                                 {round.round_name}

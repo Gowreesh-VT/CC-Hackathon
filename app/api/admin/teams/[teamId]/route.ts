@@ -47,6 +47,47 @@ export async function PATCH(
             );
         }
 
+        // Special Logic: If shortlisting, grant access to the NEXT round
+        let updateData = { ...body };
+
+        if (body.is_shortlisted === true) {
+            // 1. Find the current max round number the team has access to
+            const currentTeam = await Team.findById(teamId).populate('rounds_accessible');
+            const currentRounds = currentTeam.rounds_accessible || [];
+
+            // Default to Round 0 if no rounds accessible (so next is Round 1)
+            // Or usually they have access to Round 1, so max is 1. Next is 2.
+            const maxRoundNum = currentRounds.reduce((max: number, r: any) =>
+                Math.max(max, r.round_number || 0), 0) || (currentRounds.length > 0 ? 1 : 0);
+
+            // 2. Find the next round
+            const Round = (await import("@/models/Round")).default;
+            const nextRound = await Round.findOne({ round_number: maxRoundNum + 1 });
+
+            if (nextRound) {
+                console.log(`[PATCH] Auto-promoting team ${teamId} to Round ${nextRound.round_number}`);
+                // Add to rounds_accessible using $addToSet to avoid duplicates
+                // affect updateData or run separate update?
+                // Mongoose updateOne with $addToSet and $set can be combined.
+
+                // We'll modify updateData to use $addToSet if possible, but findingByIdAndUpdate 
+                // with mixed $set and strictly defined fields in body is tricky if body is just object.
+                // Better to use a dedicated update object.
+
+                const updateOp: any = { $set: body };
+                updateOp.$addToSet = { rounds_accessible: nextRound._id };
+
+                // Execute immediately here to return updated doc
+                const updatedTeam = await Team.findByIdAndUpdate(teamId, updateOp, { new: true });
+
+                console.log(`[PATCH] Team updated with promotion:`, updatedTeam);
+                return NextResponse.json({
+                    message: "Team updated and promoted",
+                    team: updatedTeam
+                });
+            }
+        }
+
         const updatedTeam = await Team.findByIdAndUpdate(teamId, body, { new: true });
 
         if (!updatedTeam) {

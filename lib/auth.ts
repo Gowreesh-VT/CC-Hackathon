@@ -36,11 +36,8 @@ export const authOptions: NextAuthOptions = {
 
         if (dbUser) {
           token.role = dbUser.role;
+          token.team_id = dbUser.team_id?.toString();
         } else {
-          // Default role for new users causing them to be 'team' or just guest?
-          // For now, let's default to "team" but they won't be in DB yet until they sign up properly? 
-          // Or we rely on the specific seed users. 
-          // If we want to allow auto-signup as 'team', we could do it here or just assign a default role in token.
           token.role = "team";
         }
       }
@@ -49,6 +46,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.role = token.role;
+        session.user.team_id = token.team_id;
       }
       return session;
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,16 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, ChevronRight, ListOrdered } from "lucide-react";
-import { mockRounds } from "@/lib/mock/adminMockData";
 import { cn } from "@/lib/utils";
-
-// Define round type
-type Round = {
-  id: string;
-  name: string;
-  status: 'completed' | 'active' | 'pending';
-  submissions: number;
-};
+import { useGetAdminRoundsQuery, useCreateRoundMutation } from "@/lib/redux/api/adminApi";
+import { toast } from "sonner";
 
 export default function AdminRoundsPage() {
   const [createOpen, setCreateOpen] = useState(false);
@@ -34,59 +27,30 @@ export default function AdminRoundsPage() {
   const [instructions, setInstructions] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch Rounds
-  const fetchRounds = async () => {
-    try {
-      const res = await fetch("/api/admin/rounds");
-      if (res.ok) {
-        const data = await res.json();
-        setRounds(data);
-      }
-    } catch (error) {
-      console.error("Error fetching rounds:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRounds();
-  }, []);
+  const { data: rounds = [], isLoading } = useGetAdminRoundsQuery();
+  const [createRound] = useCreateRoundMutation();
 
   const handleCreateRound = async () => {
     if (!roundNumber) return;
 
     try {
-      const res = await fetch("/api/admin/rounds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          round_number: parseInt(roundNumber),
-          instructions,
-          start_time: startTime ? new Date(startTime).toISOString() : null,
-          end_time: endTime ? new Date(endTime).toISOString() : null,
-          // name is not in schema but maybe we interpret "Round X"
-        }),
-      });
+      await createRound({
+        round_number: parseInt(roundNumber),
+        instructions,
+        start_time: startTime ? new Date(startTime).toISOString() : null,
+        end_time: endTime ? new Date(endTime).toISOString() : null,
+      }).unwrap();
 
-      if (res.ok) {
-        alert("Round created successfully");
-        setCreateOpen(false);
-        setRoundNumber("");
-        setInstructions("");
-        setStartTime("");
-        setEndTime("");
-        fetchRounds();
-      } else {
-        const err = await res.json();
-        alert(`Failed to create round: ${err.error}`);
-      }
-    } catch (e) {
+      toast.success("Round created successfully");
+      setCreateOpen(false);
+      setRoundNumber("");
+      setInstructions("");
+      setStartTime("");
+      setEndTime("");
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to create round");
+      toast.error(`Failed to create round: ${e?.data?.error || "Unknown error"}`);
     }
   };
 
@@ -192,12 +156,12 @@ export default function AdminRoundsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {loading ? (
+            {isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading rounds...</p>
             ) : rounds.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No rounds found. Create one to get started.</p>
             ) : (
-                rounds.map((round) => (
+                rounds.map((round: any) => (
                   <Link
                     key={round._id}
                     href={`/admin/rounds/${round._id}`}

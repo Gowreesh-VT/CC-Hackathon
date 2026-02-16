@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   XCircle,
   Users,
   MoreHorizontal,
+  Plus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,8 +37,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { 
+  useGetAdminTeamsQuery, 
+  useCreateTeamMutation, 
+  useUpdateTeamStatusMutation 
+} from "@/lib/redux/api/adminApi";
+import { toast } from "sonner";
 
 // Define team type based on API response
 type Team = {
@@ -54,92 +60,42 @@ type Team = {
 };
 
 export default function AdminTeamsPage() {
-  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchTeams = async () => {
-    try {
-      const res = await fetch("/api/admin/teams");
-      if (res.ok) {
-        const data = await res.json();
-        // Map API data to UI model if needed, but existing API returns similar structure
-        // API returns { id, name, track, currentRoundId, score }
-        // We need to ensure isLocked, isShortlisted, isEliminated are present (added to schema)
-        // API might need update to return these fields? 
-        // GET /api/admin/teams returns what? 
-        // It returns formattedTeams with id, name, track, currentRoundId, score.
-        // It does NOT return isLocked, isShortlisted, isEliminated yet.
-        // I need to update GET /api/admin/teams/route.ts to return these.
-        // But for now, I'll assume they come in the response or default to false.
-        
-        // Actually, I should update GET endpoint to included these fields.
-        // I'll do that in a separate step or assume I did it.
-        // Wait, I viewed api/admin/teams/route.ts but didn't edit GET.
-        // I should edit GET to include these fields.
-        
-        setTeams(data.map((t: any) => ({
-            ...t,
-            // The API now returns 'submissionStatus' which factors in real boolean status
-            // We just ensure the camelCase matches what the API sends.
-            // API sends: id, name, track, isLocked, isShortlisted, isEliminated, submissionStatus
-            // Our local type expects: isLocked, isShortlisted...
-            // So we can largely just use 't' but let's be explicit to be safe
-            id: t.id,
-            name: t.name,
-            track: t.track,
-            currentRoundName: t.currentRoundName,
-            score: t.score,
-            isLocked: t.isLocked,
-            isShortlisted: t.isShortlisted,
-            isEliminated: t.isEliminated,
-            submissionStatus: t.submissionStatus
-        })));
-      }
-    } catch (e) {
-      console.error("Failed to fetch teams", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTeams();
-  }, []);
+  
+  // RTK Query Hooks
+  const { data: teams = [], isLoading } = useGetAdminTeamsQuery(undefined, {
+      pollingInterval: 30000, // Poll every 30s
+      refetchOnFocus: true,
+      refetchOnMountOrArgChange: true
+  });
+  const [createTeam] = useCreateTeamMutation();
+  const [updateTeamStatus] = useUpdateTeamStatusMutation();
 
   const selectedTeam = selectedTeamId
-    ? teams.find((t) => t.id === selectedTeamId)
+    ? teams.find((t: any) => t.id === selectedTeamId)
     : null;
 
-  const updateTeamStatus = async (teamId: string, updates: any) => {
+  const handleUpdateTeamStatus = async (teamId: string, updates: any) => {
       try {
-          const res = await fetch(`/api/admin/teams/${teamId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updates)
-          });
-          if (res.ok) {
-              fetchTeams(); // Refresh
-              setSelectedTeamId(null);
-          } else {
-              alert("Failed to update team");
-          }
+          await updateTeamStatus({ id: teamId, updates }).unwrap();
+          toast.success("Team status updated");
+          setSelectedTeamId(null);
       } catch (e) {
           console.error(e);
-          alert("Error updating team");
+          toast.error("Error updating team");
       }
   };
 
   const handleLockSubmission = (teamId: string) => {
-      updateTeamStatus(teamId, { is_locked: true });
+      handleUpdateTeamStatus(teamId, { is_locked: true });
   };
 
   const handleShortlist = (teamId: string) => {
-      updateTeamStatus(teamId, { is_shortlisted: true });
+      handleUpdateTeamStatus(teamId, { is_shortlisted: true });
   };
 
   const handleEliminate = (teamId: string) => {
-      updateTeamStatus(teamId, { is_eliminated: true });
+      handleUpdateTeamStatus(teamId, { is_eliminated: true });
   };
 
   // Create Team Logic
@@ -150,36 +106,27 @@ export default function AdminTeamsPage() {
 
   const handleCreateTeam = async () => {
     try {
-        const res = await fetch("/api/admin/teams", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                name: newTeamName, 
-                email: newTeamEmail,
-                track: newTeamTrack 
-            })
-        });
+        await createTeam({ 
+            name: newTeamName, 
+            email: newTeamEmail,
+            track: newTeamTrack 
+        }).unwrap();
         
-        if (res.ok) {
-            alert("Team created successfully");
-            setCreateOpen(false);
-            setNewTeamName("");
-            setNewTeamEmail("");
-            setNewTeamTrack("");
-            fetchTeams();
-        } else {
-            alert("Failed to create team");
-        }
+        toast.success("Team created successfully");
+        setCreateOpen(false);
+        setNewTeamName("");
+        setNewTeamEmail("");
+        setNewTeamTrack("");
     } catch (error) {
         console.error("Error creating team:", error);
-        alert("Error creating team");
+        toast.error("Error creating team");
     }
   };
 
   const submissionStatusVariant = (status: string) => {
     switch (status) {
       case "eliminated": return "destructive";
-      case "shortlisted": return "default"; // or a custom green class
+      case "shortlisted": return "default";
       case "submitted": return "default";
       case "pending": return "secondary";
       case "locked": return "outline";
@@ -283,77 +230,83 @@ export default function AdminTeamsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teams.map((team) => (
-                  <TableRow
-                    key={team.id}
-                    className={cn(
-                      "cursor-pointer border-border/50 transition-colors",
-                      selectedTeamId === team.id && "bg-muted/50"
-                    )}
-                    data-state={selectedTeamId === team.id ? "selected" : undefined}
-                    onClick={() =>
-                      setSelectedTeamId((id) => (id === team.id ? null : team.id))
-                    }
-                  >
-                    <TableCell className="font-medium">
-                        <Link href={`/admin/teams/${team.id}`} className="hover:underline text-blue-400">
-                            {team.name}
-                        </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {team.track ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {team.currentRoundName ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {team.score ?? "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={submissionStatusVariant(team.submissionStatus)}>
-                        {team.submissionStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 rounded-lg"
-                            aria-label="Team actions"
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem
-                            onClick={() => handleLockSubmission(team.id)}
-                            disabled={team.isLocked}
-                            className="gap-2"
-                          >
-                            <Lock className="size-4" />
-                            Lock submissions
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleShortlist(team.id)}
-                            className="gap-2"
-                          >
-                            <Trophy className="size-4" />
-                            Shortlist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleEliminate(team.id)}
-                            className="gap-2 text-destructive focus:text-destructive"
-                          >
-                            <XCircle className="size-4" />
-                            Eliminate
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">Loading teams...</TableCell>
+                    </TableRow>
+                ) : (
+                    teams.map((team: any) => (
+                    <TableRow
+                        key={team.id}
+                        className={cn(
+                        "cursor-pointer border-border/50 transition-colors",
+                        selectedTeamId === team.id && "bg-muted/50"
+                        )}
+                        data-state={selectedTeamId === team.id ? "selected" : undefined}
+                        onClick={() =>
+                        setSelectedTeamId((id) => (id === team.id ? null : team.id))
+                        }
+                    >
+                        <TableCell className="font-medium">
+                            <Link href={`/admin/teams/${team.id}`} className="hover:underline text-blue-400">
+                                {team.name}
+                            </Link>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                        {team.track ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                        {team.currentRoundName ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                        {team.score ?? "N/A"}
+                        </TableCell>
+                        <TableCell>
+                        <Badge variant={submissionStatusVariant(team.submissionStatus)}>
+                            {team.submissionStatus}
+                        </Badge>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 rounded-lg"
+                                aria-label="Team actions"
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem
+                                onClick={() => handleLockSubmission(team.id)}
+                                disabled={team.isLocked}
+                                className="gap-2"
+                            >
+                                <Lock className="size-4" />
+                                Lock submissions
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => handleShortlist(team.id)}
+                                className="gap-2"
+                            >
+                                <Trophy className="size-4" />
+                                Shortlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => handleEliminate(team.id)}
+                                className="gap-2 text-destructive focus:text-destructive"
+                            >
+                                <XCircle className="size-4" />
+                                Eliminate
+                            </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                    ))
+                )}
               </TableBody>
             </Table>
           </div>

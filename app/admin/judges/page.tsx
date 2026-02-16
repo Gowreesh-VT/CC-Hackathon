@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import type { Judge, TeamDetail } from "@/lib/redux/api/types";
 import {
   useGetJudgesQuery,
-  useGetTeamsQuery,
+  useGetAdminTeamsQuery,
   useCreateJudgeMutation,
   useDeleteJudgeMutation,
   useAssignTeamsToJudgeMutation,
@@ -44,7 +44,7 @@ export default function AdminJudgesPage() {
 
   // RTK Query hooks
   const { data: judges = [], isLoading: isLoadingJudges } = useGetJudgesQuery();
-  const { data: teams = [], isLoading: isLoadingTeams } = useGetTeamsQuery();
+  const { data: teams = [], isLoading: isLoadingTeams } = useGetAdminTeamsQuery();
   const [createJudge] = useCreateJudgeMutation();
   const [deleteJudge] = useDeleteJudgeMutation();
   const [assignTeams] = useAssignTeamsToJudgeMutation();

@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { connectDB } from "@/config/db";
+import { getTeamSession } from "@/lib/getTeamSession";
+import Team from "@/models/Team";
+import Round from "@/models/Round";
+import Subtask from "@/models/Subtask";
+import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
+import Submission from "@/models/Submission";
+
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const { teamId } = await getTeamSession();
+
+        await connectDB();
+
+        const round = await Round.findById(id).lean();
+        if (!round) {
+            return NextResponse.json({ error: "Round not found" }, { status: 404 });
+        }
+
+        const selection = await TeamSubtaskSelection.findOne({
+            team_id: teamId,
+            round_id: id,
+        }).lean();
+
+        let subtask = null;
+        let submission = null;
+        let initialSubtasks: any[] = [];
+
+        if (selection) {
+            if (selection.subtask_id) {
+                subtask = await Subtask.findById(selection.subtask_id).lean();
+            }
+            submission = await Submission.findOne({
+                team_id: teamId,
+                round_id: id,
+            }).lean();
+        } else {
+            // If no selection, get 2 random subtasks
+            const subs = await Subtask.aggregate([
+                { $match: { round_id: new mongoose.Types.ObjectId(round._id as string) } },
+                { $sample: { size: 2 } },
+            ]);
+            initialSubtasks = subs.map((s: any) => ({
+                id: s._id.toString(),
+                title: s.title,
+                description: s.description,
+            }));
+        }
+
+        // Serialize data
+        const responseData = {
+            round: {
+                _id: round._id,
+                round_number: round.round_number,
+                is_active: round.is_active,
+                instructions: round.instructions,
+            },
+            selection: selection ? {
+                _id: selection._id,
+                subtask_id: selection.subtask_id,
+                team_id: selection.team_id,
+                round_id: selection.round_id,
+            } : null,
+            subtask: subtask ? {
+                _id: subtask._id,
+                title: subtask.title,
+                description: subtask.description,
+            } : null,
+            submission: submission ? {
+                _id: submission._id,
+                submitted_at: submission.submitted_at,
+                github_link: submission.github_link,
+                file_url: submission.file_url,
+                overview: submission.overview,
+            } : null,
+            initialSubtasks,
+        };
+
+        return NextResponse.json(responseData);
+    } catch (err: any) {
+        console.error("GET /api/team/rounds/[id] error:", err);
+        const status = err.status || 500;
+        const message = err.error || "Internal Server Error";
+        return NextResponse.json(
+            { error: message },
+            { status }
+        );
+    }
+}

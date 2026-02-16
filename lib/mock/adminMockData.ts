@@ -11,6 +11,7 @@ export const mockDashboard: AdminDashboard = {
   totalTeams: 24,
   currentRound: {
     id: "r1",
+    _id: "r1",
     round_number: 1,
     name: "Round 1",
     status: "active",
@@ -29,6 +30,7 @@ export const mockDashboard: AdminDashboard = {
 export const mockRounds: Round[] = [
   {
     id: "r1",
+    _id: "r1",
     round_number: 1,
     name: "Round 1",
     status: "active",
@@ -39,6 +41,7 @@ export const mockRounds: Round[] = [
   },
   {
     id: "r2",
+    _id: "r2",
     round_number: 2,
     name: "Round 2",
     status: "draft",
@@ -49,6 +52,7 @@ export const mockRounds: Round[] = [
   },
   {
     id: "r3",
+    _id: "r3",
     round_number: 3,
     name: "Final Round",
     status: "draft",

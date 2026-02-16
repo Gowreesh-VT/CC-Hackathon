@@ -30,19 +30,36 @@ export async function GET(request: NextRequest) {
         }
 
         // Get all rounds the team can access
-        const rounds = await Round.find({
-            _id: { $in: team.rounds_accessible },
-        }).sort({ round_number: 1 });
+        // Logic: specific accessibility OR active OR submission enabled
+        // Get all rounds and filter based on strict accessibility rules
+        const allRounds = await Round.find({}).sort({ round_number: 1 });
+
+        // Convert ObjectIds to strings for comparison
+        const accessibleRoundIds = new Set(
+            (team.rounds_accessible || []).map((id: any) => id.toString())
+        );
+
+        const rounds = allRounds.filter(r => {
+            // Round 1: Open if active OR submission enabled OR explicitly accessible
+            if (r.round_number === 1) {
+                return r.is_active || r.submission_enabled || accessibleRoundIds.has(r._id.toString());
+            }
+
+            // Round > 1: STRICTLY requiring explicit access (via shortlisting)
+            return accessibleRoundIds.has(r._id.toString());
+        });
+
+        const visibleRoundIds = rounds.map(r => r._id);
 
         // Fetch selections and submissions for all accessible rounds in bulk
         const [selections, submissions] = await Promise.all([
             TeamSubtaskSelection.find({
                 team_id: teamId,
-                round_id: { $in: team.rounds_accessible },
+                round_id: { $in: visibleRoundIds },
             }),
             Submission.find({
                 team_id: teamId,
-                round_id: { $in: team.rounds_accessible },
+                round_id: { $in: visibleRoundIds },
             }),
         ]);
 
@@ -73,7 +90,7 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        return NextResponse.json({ rounds: enrichedRounds });
+        return NextResponse.json(enrichedRounds);
     } catch (err: any) {
         if (err.status && err.error) {
             return NextResponse.json(

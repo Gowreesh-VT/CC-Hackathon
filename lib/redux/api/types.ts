@@ -1,12 +1,14 @@
 export type Team = {
   id: string;
   name: string;
+  email?: string;
   track?: string | null;
   currentRoundId?: string | null;
   score?: number | null;
 };
 
 export type Round = {
+  _id: string;
   id: string;
   round_number?: number;
   name?: string;
@@ -17,6 +19,7 @@ export type Round = {
   endsAt?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+  instructions?: string;
 };
 
 export type Judge = {
@@ -52,6 +55,7 @@ export type Subtask = {
   description: string;
   round_id: string;
   is_active?: boolean;
+  order?: number;
 };
 
 export type TeamDetail = {
@@ -64,6 +68,7 @@ export type TeamDetail = {
   submissionStatus: "pending" | "submitted" | "locked" | "not_required";
   isShortlisted?: boolean;
   isLocked?: boolean;
+  isEliminated?: boolean;
 };
 
 export type RoundTeamSelection = {

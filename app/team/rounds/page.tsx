@@ -1,14 +1,19 @@
-"use server";
+"use client";
 
 import Link from "next/link";
-import { connectDB } from "@/config/db";
-import Round from "@/models/Round";
+import { useGetTeamRoundsQuery } from "@/lib/redux/api/teamApi";
+import { Loader2 } from "lucide-react";
 
-type RoundItem = { id: string; name: string; status: string };
+export default function Page() {
+  const { data: rounds = [], isLoading } = useGetTeamRoundsQuery();
 
-export default async function Page() {
-  await connectDB();
-  const rounds = await Round.find({}).sort({ round_number: 1 }).lean();
+  if (isLoading) {
+      return (
+          <main className="min-h-screen p-6 bg-gradient-to-b from-black via-neutral-900 to-neutral-800 text-white flex items-center justify-center">
+              <Loader2 className="h-10 w-10 animate-spin text-lime-500" />
+          </main>
+      )
+  }
 
   return (
     <main className="min-h-screen p-6 bg-gradient-to-b from-black via-neutral-900 to-neutral-800 text-white">
@@ -23,8 +28,8 @@ export default async function Page() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {rounds.map((r: any) => (
             <Link
-              key={r._id.toString()}
-              href={`/team/rounds/${r._id.toString()}`}
+              key={r._id}
+              href={`/team/rounds/${r._id}`}
               className="block"
             >
               <article className="p-4 rounded-lg bg-neutral-900 border border-neutral-800 hover:scale-[1.01] transition-transform">
@@ -32,7 +37,7 @@ export default async function Page() {
                   <div>
                     <div className="text-sm text-gray-300">{`Round ${r.round_number}`}</div>
                     <div className="text-xs text-gray-400 mt-1">
-                      ID: {r._id.toString()}
+                      ID: {r._id}
                     </div>
                   </div>
                   <div
@@ -54,6 +59,9 @@ export default async function Page() {
               </article>
             </Link>
           ))}
+          {rounds.length === 0 && (
+              <p className="text-gray-400 col-span-2 text-center py-10">No rounds found.</p>
+          )}
         </div>
       </div>
     </main>

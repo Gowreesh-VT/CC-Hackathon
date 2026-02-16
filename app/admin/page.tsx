@@ -23,116 +23,73 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { 
+  useGetAdminDashboardQuery, 
+  useGetAdminRoundsQuery, 
+  useToggleRoundStatusMutation 
+} from "@/lib/redux/api/adminApi";
+import { toast } from "sonner";
 
 export default function AdminDashboardPage() {
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [submissionToggled, setSubmissionToggled] = useState(false);
-  const [stats, setStats] = useState<any>(null);
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch Stats and Rounds
-  const fetchData = async () => {
-     try {
-        const [statsRes, roundsRes] = await Promise.all([
-           fetch("/api/admin/dashboard"),
-           fetch("/api/admin/rounds")
-        ]);
+  // RTK Query Hooks
+  const { data: stats, isLoading: statsLoading } = useGetAdminDashboardQuery();
+  const { data: rounds = [], isLoading: roundsLoading } = useGetAdminRoundsQuery();
+  const [toggleRoundStatus] = useToggleRoundStatusMutation();
 
-        if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            setStats(statsData);
-            if (statsData.currentRound) {
-               // Only set if not already set by user interaction
-               if (!selectedRoundId) setSelectedRoundId(statsData.currentRound.id);
-            }
-        }
-        
-        if (roundsRes.ok) {
-            const roundsData = await roundsRes.json();
-            setRounds(roundsData);
-            
-            // Sync toggle state with selected round
-            if (selectedRoundId) {
-                const r = roundsData.find((rd: any) => rd._id === selectedRoundId);
-                if (r) setSubmissionToggled(r.submission_enabled);
-            }
-        }
-     } catch (error) {
-         console.error("Error fetching admin data:", error);
-     } finally {
-         setLoading(false);
-     }
-  };
+  const loading = statsLoading || roundsLoading;
 
+  // Initialize selectedRoundId from stats
   useEffect(() => {
-     fetchData();
-  }, []);
+    if (stats?.currentRound && !selectedRoundId) {
+       setSelectedRoundId(stats.currentRound.id);
+    }
+  }, [stats, selectedRoundId]);
 
-  // Update toggle when round selection changes
+  // Sync toggle state with selected round
   useEffect(() => {
      if (selectedRoundId && rounds.length > 0) {
         const r = rounds.find((rd: any) => rd._id === selectedRoundId);
-        if (r) setSubmissionToggled(r.submission_enabled);
+        if (r) setSubmissionToggled(r.submission_enabled ?? false);
      }
   }, [selectedRoundId, rounds]);
 
   const handleStartRound = async () => {
     if (!selectedRoundId) return;
     try {
-        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'start' })
-        });
-        if (res.ok) {
-            alert("Round started successfully");
-            fetchData();
-        }
+        await toggleRoundStatus({ id: selectedRoundId, action: 'start' }).unwrap();
+        toast.success("Round started successfully");
     } catch (e) {
         console.error(e);
-        alert("Failed to start round");
+        toast.error("Failed to start round");
     }
   };
 
   const handleStopRound = async () => {
     if (!selectedRoundId) return;
     try {
-        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'stop' })
-        });
-        if (res.ok) {
-            alert("Round stopped successfully");
-            fetchData();
-        }
+        await toggleRoundStatus({ id: selectedRoundId, action: 'stop' }).unwrap();
+        toast.success("Round stopped successfully");
     } catch (e) {
         console.error(e);
-        alert("Failed to stop round");
+        toast.error("Failed to stop round");
     }
   };
 
   const handleToggleSubmission = async (checked: boolean) => {
+    // Optimistic update
     setSubmissionToggled(checked);
     if (!selectedRoundId) return;
     
     try {
-        const res = await fetch(`/api/admin/rounds/${selectedRoundId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'toggle-submission' })
-        });
-        if (res.ok) {
-            fetchData(); // Refresh to ensure sync
-        } else {
-             setSubmissionToggled(!checked); // Revert on failure
-             alert("Failed to toggle submission");
-        }
+        await toggleRoundStatus({ id: selectedRoundId, action: 'toggle-submission' }).unwrap();
+        toast.success(`Submissions ${checked ? 'enabled' : 'disabled'}`);
     } catch (e) {
         console.error(e);
-        setSubmissionToggled(!checked);
-        alert("Failed to toggle submission");
+        setSubmissionToggled(!checked); // Revert on failure
+        toast.error("Failed to toggle submission");
     }
   };
 
@@ -259,7 +216,7 @@ export default function AdminDashboardPage() {
                   <SelectValue placeholder="Select a round" />
                 </SelectTrigger>
                 <SelectContent>
-                  {rounds.map((r) => (
+                  {rounds.map((r: any) => (
                     <SelectItem key={r._id} value={r._id}>
                       {`Round ${r.round_number} ${r.is_active ? '(Active)' : ''}`}
                     </SelectItem>

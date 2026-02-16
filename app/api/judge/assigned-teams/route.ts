@@ -1,5 +1,5 @@
 import { connectDB } from "@/config/db"
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import User from "@/models/User"
@@ -47,13 +47,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const assignments = await JudgeAssignment.find(query).populate("team_id")
+  console.log(`[JudgeAPI] Params: roundId=${roundId}`);
+
+  const assignments = await JudgeAssignment.find(query).populate("team_id");
+  console.log(`[JudgeAPI] Found ${assignments.length} assignments`);
 
   const results = await Promise.all(
     assignments.map(async (a: any) => {
-      const team = a.team_id
-      if (!team) return null;
-
+      const team = a.team_id;
+      if (!team) {
+        console.log(`[JudgeAPI] Assignment ${a._id} has no team_id`);
+        return null;
+      }
 
       const existing = await Score.findOne({
         judge_id: judge._id,
@@ -65,11 +70,14 @@ export async function GET(req: NextRequest) {
         team_id: team._id,
         team_name: team.team_name,
         status: existing ? "scored" : "pending",
+        round_id: a.round_id, // Return round_id too
+        score: existing ? existing.total_score : undefined
       }
     })
   )
 
   const filteredResults = results.filter((r) => r !== null);
+  console.log(`[JudgeAPI] Returning ${filteredResults.length} teams`);
 
-  return Response.json({ data: filteredResults })
+  return NextResponse.json(filteredResults)
 }

@@ -8,137 +8,111 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Save, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { 
+  useGetRoundDetailsQuery, 
+  useGetSubtasksQuery, 
+  useUpdateRoundMutation, 
+  useCreateSubtaskMutation, 
+  useDeleteSubtaskMutation 
+} from "@/lib/redux/api/adminApi";
+import { toast } from "sonner";
 
 export default function RoundDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const roundId = params.roundId as string;
 
-  const [round, setRound] = useState<any>(null);
-  const [subtasks, setSubtasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query Hooks
+  const { data: round, isLoading: roundLoading } = useGetRoundDetailsQuery(roundId);
+  const { data: subtasks = [], isLoading: subtasksLoading } = useGetSubtasksQuery(roundId);
+  const [updateRound] = useUpdateRoundMutation();
+  const [createSubtask] = useCreateSubtaskMutation();
+  const [deleteSubtask] = useDeleteSubtaskMutation();
 
-  // Edit Round State
+  // Local State for forms
   const [instructions, setInstructions] = useState("");
-  const [roundNumber, setRoundNumber] = useState(""); // Added state
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-
-  // Create Subtask State
   const [createSubtaskOpen, setCreateSubtaskOpen] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [newSubtaskDesc, setNewSubtaskDesc] = useState("");
 
-  const fetchData = async () => {
-    try {
-      const [roundRes, subtasksRes] = await Promise.all([
-        fetch(`/api/admin/rounds/${roundId}`),
-        fetch(`/api/admin/subtasks?round_id=${roundId}`)
-      ]);
+  const loading = roundLoading || subtasksLoading;
 
-      if (roundRes.ok) {
-        const data = await roundRes.json();
-        setRoundNumber(data.round_number);
-        setInstructions(data.instructions || "");
-        if (data.start_time) {
-            const date = new Date(data.start_time);
-            const localIso = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-            setStartTime(localIso);
-        }
-        if (data.end_time) {
-            const date = new Date(data.end_time);
-            const localIso = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-            setEndTime(localIso);
-        }
-        setRound(data);
-      }
-
-      if (subtasksRes.ok) {
-        const data = await subtasksRes.json();
-        setSubtasks(data);
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initialize form state when data is loaded
   useEffect(() => {
-    if (roundId) fetchData();
-  }, [roundId]);
+    if (round) {
+      setInstructions(round.instructions || "");
+      if (round.start_time) {
+          const date = new Date(round.start_time);
+          const localIso = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+          setStartTime(localIso);
+      }
+      if (round.end_time) {
+          const date = new Date(round.end_time);
+          const localIso = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+          setEndTime(localIso);
+      }
+    }
+  }, [round]);
 
   const handleUpdateRound = async () => {
     try {
-        const res = await fetch(`/api/admin/rounds/${roundId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        await updateRound({
+            id: roundId,
+            body: {
                 instructions,
-                start_time: startTime ? new Date(startTime).toISOString() : null,
-                end_time: endTime ? new Date(endTime).toISOString() : null
-            })
-        });
-        if (res.ok) {
-            alert("Round updated");
-            fetchData();
-        } else {
-            alert("Failed to update round");
-        }
+                start_time: startTime ? new Date(startTime).toISOString() : undefined,
+                end_time: endTime ? new Date(endTime).toISOString() : undefined
+            }
+        }).unwrap();
+        toast.success("Round updated successfully");
     } catch (e) {
         console.error(e);
-        alert("Error updating round");
+        toast.error("Error updating round");
     }
   };
 
   const handleCreateSubtask = async () => {
     try {
-        const res = await fetch("/api/admin/subtasks", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                round_id: roundId,
-                title: newSubtaskTitle,
-                description: newSubtaskDesc
-            })
-        });
+        await createSubtask({
+            round_id: roundId,
+            title: newSubtaskTitle,
+            description: newSubtaskDesc
+        }).unwrap();
 
-        if (res.ok) {
-            setCreateSubtaskOpen(false);
-            setNewSubtaskTitle("");
-            setNewSubtaskDesc("");
-            fetchData();
-        } else {
-            alert("Failed to create subtask");
-        }
+        toast.success("Subtask created successfully");
+        setCreateSubtaskOpen(false);
+        setNewSubtaskTitle("");
+        setNewSubtaskDesc("");
     } catch (e) {
         console.error(e);
-        alert("Error creating subtask");
+        toast.error("Error creating subtask");
     }
   };
 
   const handleDeleteSubtask = async (id: string) => {
       if (!confirm("Are you sure you want to delete this subtask?")) return;
       try {
-          const res = await fetch(`/api/admin/subtasks/${id}`, { method: 'DELETE' });
-          if (res.ok) fetchData();
+          await deleteSubtask(id).unwrap();
+          toast.success("Subtask deleted");
       } catch (e) {
           console.error(e);
+          toast.error("Error deleting subtask");
       }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
+  if (loading) return <div className="p-8">Loading round details...</div>;
   if (!round) return <div className="p-8">Round not found</div>;
 
   return (
@@ -252,7 +226,7 @@ export default function RoundDetailsPage() {
                         <p className="text-muted-foreground text-sm">No subtasks defined.</p>
                     ) : (
                         <div className="space-y-3">
-                            {subtasks.map((task) => (
+                            {subtasks.map((task: any) => (
                                 <div key={task._id} className="flex items-start justify-between p-4 rounded-lg border bg-muted/20">
                                     <div>
                                         <h4 className="font-medium">{task.title}</h4>
