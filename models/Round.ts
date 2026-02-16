@@ -6,6 +6,7 @@ export interface IRound extends Document {
   end_time: Date
   is_active: boolean
   submission_enabled: boolean
+  instructions: string
   created_at: Date
 }
 
@@ -15,6 +16,7 @@ const RoundSchema = new Schema<IRound>({
   end_time: Date,
   is_active: { type: Boolean, default: false },
   submission_enabled: { type: Boolean, default: false },
+  instructions: { type: String, default: "" }, // Instructions for the round
   created_at: { type: Date, default: Date.now },
 })
 

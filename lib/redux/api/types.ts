@@ -23,6 +23,7 @@ export type Judge = {
   id: string;
   name: string;
   email: string;
+  assignedTeams?: string[];
   assignedTeamsCount?: number;
 };
 

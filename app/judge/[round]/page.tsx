@@ -36,21 +36,37 @@ export default function JudgeRoundPage() {
     remarks: ""
   });
 
-  // Mock team data - would come from API
-  const [teamInfo] = useState<TeamInfo>({
-    id: teamId,
-    name: teamId === "team-alpha" ? "Team Alpha" : teamId === "team-beta" ? "Team Beta" : "Team",
-    chosenTask: "Build an AI-powered recommendation system",
-    submittedFiles: [
-      { name: "project-demo.mp4", url: "#", type: "video" },
-      { name: "documentation.pdf", url: "#", type: "pdf" },
-      { name: "source-code.zip", url: "#", type: "archive" }
-    ],
-    submittedLinks: [
-      "https://github.com/team-alpha/project",
-      "https://demo.team-alpha.com"
-    ]
-  });
+  const [teamInfo, setTeamInfo] = useState<TeamInfo | null>(null);
+
+  useEffect(() => {
+    if (!teamId) return;
+
+    const fetchTeamDetails = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/judge/rounds/${roundId}/teams/${teamId}`);
+        const data = await res.json();
+        
+        if (data.data) {
+          const { team, submission, selected_subtask } = data.data;
+          
+          setTeamInfo({
+            id: team.team_id,
+            name: team.team_name,
+            chosenTask: selected_subtask ? selected_subtask.title : "No task selected",
+            submittedFiles: submission?.file_url ? [{ name: "Submission File", url: submission.file_url, type: "file" }] : [],
+            submittedLinks: submission?.github_link ? [submission.github_link] : []
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching team details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeamDetails();
+  }, [teamId, roundId]);
 
   // Handle input change
   const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,14 +95,24 @@ export default function JudgeRoundPage() {
     }
 
     const confirmed = window.confirm(
-      `Submit evaluation for ${teamInfo.name}?\n\nScore: ${evaluation.score}\nRemarks: ${evaluation.remarks || 'None'}`
+      `Submit evaluation for ${teamInfo?.name}?\n\nScore: ${evaluation.score}\nRemarks: ${evaluation.remarks || 'None'}`
     );
     if (!confirmed) return;
 
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const res = await fetch(`/api/judge/rounds/${roundId}/teams/${teamId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          score: parseInt(evaluation.score),
+          remarks: evaluation.remarks
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to submit");
       
       console.log("Submitted evaluation:", {
         teamId,
@@ -95,7 +121,7 @@ export default function JudgeRoundPage() {
         remarks: evaluation.remarks
       });
       
-      alert(`Evaluation submitted successfully!\n\nTeam: ${teamInfo.name}\nScore: ${evaluation.score}`);
+      alert(`Evaluation submitted successfully!\n\nTeam: ${teamInfo?.name}\nScore: ${evaluation.score}`);
       
       // Navigate back to judge home
       router.push('/judge');
@@ -136,6 +162,19 @@ export default function JudgeRoundPage() {
         );
     }
   };
+
+
+
+  if (isLoading || !teamInfo) {
+    return (
+      <main className="relative min-h-screen w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+         <div className="flex flex-col items-center gap-4">
+             <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-500 border-t-transparent" />
+             <p className="text-slate-400 font-mono animate-pulse">Loading team data...</p>
+         </div>
+      </main>
+    )
+  }
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-slate-950">

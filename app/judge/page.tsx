@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -17,24 +17,35 @@ type TeamAssignment = {
 export default function JudgeHomePage() {
   const router = useRouter();
   
-  // Mock assigned teams - would come from API
-  const [assignedTeams] = useState<TeamAssignment[]>([
-    { 
-      id: "team-alpha", 
-      name: "Team Alpha", 
-      status: "pending", 
-      roundId: "round-2",
-      lastUpdated: "5m ago" 
-    },
-    { 
-      id: "team-beta", 
-      name: "Team Beta", 
-      status: "scored", 
-      roundId: "round-2",
-      score: 85,
-      lastUpdated: "1h ago" 
-    },
-  ]);
+  // State for teams and loading
+  const [assignedTeams, setAssignedTeams] = useState<TeamAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTeams = async () => {
+    try {
+      const res = await fetch(`/api/judge/assigned-teams?round_id=${currentRound}`);
+      const data = await res.json();
+      
+      if (data.data) {
+        const mapped = data.data.map((t: any) => ({
+          id: t.team_id,
+          name: t.team_name,
+          status: t.status,
+          roundId: currentRound,
+          lastUpdated: "Just now" // API doesn't return this yet, could be improved
+        }));
+        setAssignedTeams(mapped);
+      }
+    } catch (error) {
+      console.error("Failed to fetch teams", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
 
   const currentRound = "round-2";
   const pendingCount = assignedTeams.filter(t => t.status === 'pending').length;

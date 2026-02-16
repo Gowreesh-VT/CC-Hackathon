@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
   const results = await Promise.all(
     assignments.map(async (a: any) => {
       const team = a.team_id
+      if (!team) return null;
+
 
       const existing = await Score.findOne({
         judge_id: judge._id,
@@ -57,5 +59,7 @@ export async function GET(req: NextRequest) {
     })
   )
 
-  return Response.json({ data: results })
+  const filteredResults = results.filter((r) => r !== null);
+
+  return Response.json({ data: filteredResults })
 }
