@@ -1,34 +1,33 @@
-"use server";
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+"use client";
+import React from "react";
 import CountDown from "../../../components/team/Countdown";
 import InstructionCard from "../../../components/team/InstructionCard";
 import Link from "next/link";
-import { connectDB } from "@/config/db";
-import User from "@/models/User";
-import Team from "@/models/Team";
-import Round from "@/models/Round";
+import { useGetTeamDashboardQuery } from "@/lib/redux/api/teamApi";
+import { Loader2 } from "lucide-react";
 
-type Props = {};
+export default function TeamDashboardPage() {
+  const { data: dashboardData, isLoading } = useGetTeamDashboardQuery();
 
-export default async function Page({}: Props) {
-  await connectDB();
+  if (isLoading) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-neutral-950">
+              <Loader2 className="h-8 w-8 animate-spin text-lime-500" />
+          </div>
+      );
+  }
 
-  const session = await getServerSession(authOptions);
-
-  const email = session?.user?.email ?? null;
-
-  const user = email ? await User.findOne({ email }).lean() : null;
-  const team = user?.team_id ? await Team.findById(user.team_id).lean() : null;
-
-  const activeRound = await Round.findOne({ is_active: true }).lean();
-
-  const teamName = team?.team_name ?? "Unknown Team";
-  const track = team?.track ?? "-";
+  // Fallback if data is missing or error
+  const teamName = dashboardData?.team_name ?? "Unknown Team";
+  const track = dashboardData?.track ?? "-";
+  // The API returns 'current_round', not 'activeRound'
+  const activeRound = dashboardData?.current_round;
+  
+  // Use current time + 1h if no end time, or data from API
   const endTime = activeRound?.end_time
     ? new Date(activeRound.end_time).toISOString()
     : new Date(Date.now() + 1000 * 60 * 60).toISOString();
+
   const currentRound = activeRound;
 
   return (
@@ -78,25 +77,26 @@ export default async function Page({}: Props) {
           </div>
 
           <aside className="hidden md:block">
+            {/* Status Panel - could be a separate component */}
             <div className="rounded-lg bg-neutral-900 p-4 border border-neutral-800">
               <div className="text-xs text-gray-400">Current Round</div>
               <div className="font-semibold text-white mt-1">
                 {currentRound ? `Round ${currentRound.round_number}` : "—"}
               </div>
               <div className="text-sm mt-2">
-                <span className="text-gray-300">Status:- </span>
+                <span className="text-gray-300">Status: </span>
                 <span
-                  className={`px-2 py-1 rounded ${
+                  className={`px-2 py-1 rounded ml-2 ${
                     currentRound?.is_active
                       ? "bg-lime-600 text-black"
                       : "bg-gray-700 text-gray-200"
                   }`}
                 >
                   {currentRound?.is_active
-                    ? "active"
+                    ? "Active"
                     : currentRound
-                    ? "closed"
-                    : "none"}
+                    ? "Closed"
+                    : "Inactive"}
                 </span>
               </div>
             </div>
