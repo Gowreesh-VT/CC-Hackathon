@@ -35,7 +35,17 @@ export async function GET(req: NextRequest) {
   }
 
   const query: any = { judge_id: judge._id }
-  if (roundId) query.round_id = roundId
+
+  if (roundId) {
+    query.round_id = roundId
+  } else {
+    // Default to active round
+    const Round = await import("@/models/Round").then(m => m.default);
+    const activeRound = await Round.findOne({ is_active: true });
+    if (activeRound) {
+      query.round_id = activeRound._id;
+    }
+  }
 
   const assignments = await JudgeAssignment.find(query).populate("team_id")
 

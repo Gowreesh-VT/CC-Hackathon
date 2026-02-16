@@ -62,10 +62,10 @@ export async function GET(
       selected_subtask: selection ? selection.subtask_id : null,
       submission: submission
         ? {
-            file_url: submission.file_url,
-            github_link: submission.github_link,
-            submitted_at: submission.submitted_at,
-          }
+          file_url: submission.file_url,
+          github_link: submission.github_link,
+          submitted_at: submission.submitted_at,
+        }
         : null,
     },
   })
@@ -110,13 +110,23 @@ export async function POST(
     })
   }
 
-  const doc = await Score.create({
-    judge_id: ids.judge._id,
-    team_id,
-    round_id,
-    score: scoreValue,
-    remarks: remarks || "",
-  })
+  const doc = await Score.findOneAndUpdate(
+    {
+      judge_id: ids.judge._id,
+      team_id,
+      round_id,
+    },
+    {
+      score: scoreValue,
+      remarks: remarks || "",
+      updated_at: new Date(),
+    },
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    }
+  )
 
   return Response.json({ data: doc })
 }

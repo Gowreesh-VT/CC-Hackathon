@@ -23,7 +23,7 @@ export default function JudgeHomePage() {
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch(`/api/judge/assigned-teams?round_id=${currentRound}`);
+      const res = await fetch(`/api/judge/assigned-teams`);
       const data = await res.json();
       
       if (data.data) {
@@ -31,8 +31,8 @@ export default function JudgeHomePage() {
           id: t.team_id,
           name: t.team_name,
           status: t.status,
-          roundId: currentRound,
-          lastUpdated: "Just now" // API doesn't return this yet, could be improved
+          roundId: t.round_id || "active", // Fallback if API doesn't return it
+          lastUpdated: "Just now" 
         }));
         setAssignedTeams(mapped);
       }
@@ -47,7 +47,7 @@ export default function JudgeHomePage() {
     fetchTeams();
   }, []);
 
-  const currentRound = "round-2";
+  // Removed hardcoded currentRound
   const pendingCount = assignedTeams.filter(t => t.status === 'pending').length;
 
   // Handle team click - navigate to evaluation page
@@ -139,7 +139,7 @@ export default function JudgeHomePage() {
                   </div>
                 </div>
                 <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-mono text-cyan-400 border border-cyan-500/20">
-                  {currentRound.toUpperCase().replace('-', ' ')}
+                  ACTIVE ROUND
                 </span>
               </div>
 
