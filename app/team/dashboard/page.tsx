@@ -2,8 +2,9 @@
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import Countdown from "../../../components/team/Countdown";
+import CountDown from "../../../components/team/Countdown";
 import InstructionCard from "../../../components/team/InstructionCard";
+import Link from "next/link";
 import { connectDB } from "@/config/db";
 import User from "@/models/User";
 import Team from "@/models/Team";
@@ -42,7 +43,7 @@ export default async function Page({}: Props) {
           </div>
 
           <div className="mt-3 md:mt-0">
-            <Countdown endTime={endTime} />
+            <CountDown endTime={endTime} />
           </div>
         </header>
 
@@ -50,6 +51,7 @@ export default async function Page({}: Props) {
           <div className="md:col-span-2">
             <InstructionCard
               status={currentRound?.is_active ? "ready" : "locked"}
+              instructions={currentRound?.instructions}
             />
             <div className="mt-3 text-sm text-gray-300">
               {currentRound?.round_number
@@ -57,13 +59,21 @@ export default async function Page({}: Props) {
                 : "No active round"}{" "}
               {currentRound?.is_active ? "Active now" : ""}
             </div>
-            <div className="mt-4">
-              <a
+            <div className="mt-4 flex gap-3">
+              <Link
                 href="/team/rounds"
-                className="inline-block bg-lime-500 text-black px-4 py-2 rounded-md"
+                className="inline-block bg-neutral-800 text-white border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors"
               >
                 View Rounds
-              </a>
+              </Link>
+              {currentRound?.is_active && (
+                <Link
+                  href={`/team/rounds/${currentRound._id}`}
+                  className="inline-block bg-lime-500 text-black border border-lime-600 px-4 py-2 rounded-md font-medium hover:bg-lime-400 transition-colors shadow-[0_0_15px_rgba(132,204,22,0.3)]"
+                >
+                  Submit Now
+                </Link>
+              )}
             </div>
           </div>
 

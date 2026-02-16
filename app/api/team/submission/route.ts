@@ -12,26 +12,8 @@ export async function POST(req: Request) {
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
-  const contentType = req.headers.get("content-type") || "";
-  let roundId: string | undefined;
-  let fileUrl: string | undefined;
-  let githubLink: string | undefined;
-
-  if (contentType.includes("multipart/form-data")) {
-    const form = await req.formData();
-    roundId = form.get("roundId")?.toString();
-    githubLink = form.get("githubLink")?.toString();
-    const file = form.get("file") as File | null;
-    if (file) {
-      // placeholder: we don't store file blobs in DB; save filename as reference
-      fileUrl = file.name;
-    }
-  } else {
-    const body = await req.json();
-    roundId = body.roundId;
-    fileUrl = body.fileUrl;
-    githubLink = body.githubLink || body.githubLink;
-  }
+  const body = await req.json();
+  const { roundId, fileUrl, githubLink, overview } = body;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -44,8 +26,32 @@ export async function POST(req: Request) {
       round_id: new mongoose.Types.ObjectId(roundId),
       file_url: fileUrl,
       github_link: githubLink,
+      overview,
     });
     return NextResponse.json({ ok: true, submission: doc });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email)
+    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+
+  await connectDB();
+  const user = await User.findOne({ email }).lean();
+  if (!user?.team_id)
+    return NextResponse.json({ error: "no team" }, { status: 400 });
+
+  try {
+    const submissions = await Submission.find({ team_id: user.team_id })
+      .populate("round_id", "round_number title")
+      .sort({ submitted_at: -1 })
+      .lean();
+
+    return NextResponse.json(submissions);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

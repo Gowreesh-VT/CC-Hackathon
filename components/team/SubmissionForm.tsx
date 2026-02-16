@@ -7,7 +7,7 @@ type Props = {
   subtask: SubtaskSummary;
   allowFileUpload?: boolean;
   roundId?: string | undefined;
-  onFinalSubmitted: (payload: {
+  onFinalSubmitted?: (payload: {
     subtaskId: string;
     githubUrl?: string;
     docUrl?: string;
@@ -23,7 +23,7 @@ export default function SubmissionForm({
 }: Props) {
   const [githubUrl, setGithubUrl] = useState("");
   const [docUrl, setDocUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [overview, setOverview] = useState("");
   const [busy, setBusy] = useState(false);
   const [final, setFinal] = useState(false);
 
@@ -33,51 +33,35 @@ export default function SubmissionForm({
     if (!canSubmit) return;
     setBusy(true);
     try {
-      if (file) {
-        const fd = new FormData();
-        if (roundId) fd.append("roundId", roundId);
-        fd.append("subtaskId", subtask.id);
-        fd.append("file", file);
-        if (githubUrl) fd.append("githubLink", githubUrl);
-        if (docUrl) fd.append("file_url", docUrl);
-        const res = await fetch("/api/team/submission", {
-          method: "POST",
-          body: fd,
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setFinal(true);
-          onFinalSubmitted({
-            subtaskId: subtask.id,
-            githubUrl,
+      const payload = {
+        roundId: roundId ?? "",
+        subtaskId: subtask.id,
+        fileUrl: docUrl,
+        githubLink: githubUrl,
+        overview: overview,
+      };
+
+      const res = await fetch("/api/team/submission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFinal(true);
+        onFinalSubmitted?.({ 
+            subtaskId: subtask.id, 
+            githubUrl, 
             docUrl,
-            fileName: file.name,
-          });
-        } else {
-          console.error(data);
-        }
-      } else {
-        const payload = {
-          roundId: roundId ?? "",
-          subtaskId: subtask.id,
-          fileUrl: docUrl,
-          githubLink: githubUrl,
-        };
-        const res = await fetch("/api/team/submission", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+            fileName: overview ? "Overview provided" : undefined
         });
-        const data = await res.json();
-        if (res.ok) {
-          setFinal(true);
-          onFinalSubmitted({ subtaskId: subtask.id, githubUrl, docUrl });
-        } else {
-          console.error(data);
-        }
+      } else {
+        console.error(data);
+        alert("Submission failed: " + (data.error || "Unknown error"));
       }
     } catch (e) {
       console.error(e);
+      alert("Submission error");
     } finally {
       setBusy(false);
     }
@@ -95,49 +79,45 @@ export default function SubmissionForm({
             value={githubUrl}
             onChange={(e) => setGithubUrl(e.target.value)}
             placeholder="https://github.com/your-repo"
-            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white"
+            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none"
           />
         </label>
 
         <label className="block mt-3">
-          <div className="text-xs text-gray-400">Document URL</div>
+          <div className="text-xs text-gray-400">Presentation Link / Document URL</div>
           <input
             value={docUrl}
             onChange={(e) => setDocUrl(e.target.value)}
             placeholder="https://drive.google.com/your-doc"
-            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white"
+            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none"
           />
         </label>
 
-        {allowFileUpload && (
-          <label className="block mt-3">
-            <div className="text-xs text-gray-400">Upload PDF</div>
-            <input
-              accept="application/pdf"
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="mt-1 w-full text-sm text-gray-200"
-            />
-            {file && (
-              <div className="text-xs text-gray-300 mt-1">
-                Selected: {file.name}
-              </div>
-            )}
-          </label>
-        )}
+        <label className="block mt-3">
+          <div className="text-xs text-gray-400">Project Overview (Optional)</div>
+          <textarea
+            value={overview}
+            onChange={(e) => setOverview(e.target.value)}
+            placeholder="Brief description of your project..."
+            rows={3}
+            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none resize-none"
+          />
+        </label>
 
         <div className="mt-4 flex gap-3">
           <button
             onClick={handleFinalSubmit}
             disabled={!canSubmit}
-            className={`px-4 py-2 rounded-md font-medium ${
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
               final
                 ? "bg-gray-600 text-white cursor-default"
-                : "bg-lime-500 hover:bg-lime-600 text-black"
+                : canSubmit 
+                    ? "bg-lime-500 hover:bg-lime-600 text-black"
+                    : "bg-gray-700 text-gray-400 cursor-not-allowed"
             }`}
           >
             {final
-              ? "Final Submitted"
+              ? "Submitted Successfully"
               : busy
               ? "Submitting..."
               : "Final Submit"}

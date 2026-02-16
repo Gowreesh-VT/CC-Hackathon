@@ -5,6 +5,7 @@ const SchemaObj = new Schema({
   round_id: { type: Schema.Types.ObjectId, ref: "Round" },
   file_url: String,
   github_link: String,
+  overview: String,
   submitted_at: { type: Date, default: Date.now },
   is_locked: { type: Boolean, default: false },
 })

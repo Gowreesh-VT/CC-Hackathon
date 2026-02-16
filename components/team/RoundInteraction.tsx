@@ -44,9 +44,13 @@ export default function RoundInteraction({
         if (res.ok) {
           setSelectedId(id);
           setLocked(true);
+          setSelectedId(data.selection.subtask_id?.toString() ?? id);
+          setLocked(true);
+          window.location.reload();
         } else if (data?.selection) {
           setSelectedId(data.selection.subtask_id?.toString() ?? id);
           setLocked(true);
+          window.location.reload();
         }
       } catch (err) {
         console.error(err);

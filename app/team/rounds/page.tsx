@@ -7,7 +7,8 @@ import Round from "@/models/Round";
 type RoundItem = { id: string; name: string; status: string };
 
 export default async function Page() {
-  const rounds: RoundItem[] = [];
+  await connectDB();
+  const rounds = await Round.find({}).sort({ round_number: 1 }).lean();
 
   return (
     <main className="min-h-screen p-6 bg-gradient-to-b from-black via-neutral-900 to-neutral-800 text-white">
