@@ -36,7 +36,7 @@ export default function LoginPage() {
       const redirectMap: Record<Role, string> = {
         admin: "/admin/judges",
         judge: "/judge",
-        team: "/team/dashboard",
+        team: "/team",
       };
       router.replace(redirectMap[role]);
     }

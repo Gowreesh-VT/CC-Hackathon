@@ -2,7 +2,10 @@
 
 import React, { useState } from "react";
 import type { SubtaskSummary } from "./SubtaskCard";
-import { useSubmitProjectMutation } from "@/lib/redux/api/teamApi";
+import {
+  useSubmitProjectMutation,
+  useUpdateSubmissionMutation,
+} from "@/lib/redux/api/teamApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,12 +16,21 @@ type Props = {
   subtask: SubtaskSummary;
   allowFileUpload?: boolean;
   roundId?: string | undefined;
+  isEditing?: boolean;
+  disabled?: boolean;
+  submission?: {
+    github_link?: string;
+    file_url?: string;
+    overview?: string;
+  };
   onFinalSubmitted?: (payload: {
     subtaskId: string;
     githubUrl?: string;
     docUrl?: string;
     fileName?: string;
   }) => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
 export default function SubmissionForm({
@@ -26,16 +38,25 @@ export default function SubmissionForm({
   onFinalSubmitted,
   allowFileUpload,
   roundId,
+  isEditing = false,
+  disabled = false,
+  submission,
+  onSuccess,
+  onCancel,
 }: Props) {
-  const [githubUrl, setGithubUrl] = useState("");
-  const [docUrl, setDocUrl] = useState("");
-  const [overview, setOverview] = useState("");
+  const [githubUrl, setGithubUrl] = useState(submission?.github_link || "");
+  const [docUrl, setDocUrl] = useState(submission?.file_url || "");
+  const [overview, setOverview] = useState(submission?.overview || "");
   const [busy, setBusy] = useState(false);
   const [final, setFinal] = useState(false);
 
-  // RTK Query hook
-  const [submitProject, { isLoading }] = useSubmitProjectMutation();
+  // RTK Query hooks
+  const [submitProject, { isLoading: isSubmitting }] =
+    useSubmitProjectMutation();
+  const [updateSubmission, { isLoading: isUpdating }] =
+    useUpdateSubmissionMutation();
 
+  const isLoading = isSubmitting || isUpdating;
   const canSubmit = (githubUrl || docUrl) && !isLoading && !final;
 
   async function handleFinalSubmit() {
@@ -50,15 +71,24 @@ export default function SubmissionForm({
         overview: overview,
       };
 
-      await submitProject(payload).unwrap();
+      if (isEditing) {
+        await updateSubmission(payload).unwrap();
+      } else {
+        await submitProject(payload).unwrap();
+      }
 
       setFinal(true);
-      onFinalSubmitted?.({
-        subtaskId: subtask.id,
-        githubUrl,
-        docUrl,
-        fileName: overview ? "Overview provided" : undefined,
-      });
+
+      if (isEditing && onSuccess) {
+        onSuccess();
+      } else {
+        onFinalSubmitted?.({
+          subtaskId: subtask.id,
+          githubUrl,
+          docUrl,
+          fileName: overview ? "Overview provided" : undefined,
+        });
+      }
     } catch (e: any) {
       console.error(e);
       alert("Submission failed: " + (e?.data?.error || "Unknown error"));
@@ -67,15 +97,6 @@ export default function SubmissionForm({
 
   return (
     <div className="w-full space-y-6">
-      <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-        <p className="text-xs font-medium text-muted-foreground">
-          SUBMITTING FOR
-        </p>
-        <p className="text-lg font-semibold text-foreground mt-1">
-          {subtask.title}
-        </p>
-      </div>
-
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="github-url">GitHub Repository URL</Label>
@@ -85,7 +106,7 @@ export default function SubmissionForm({
             onChange={(e) => setGithubUrl(e.target.value)}
             placeholder="https://github.com/your-repo"
             type="url"
-            disabled={final}
+            disabled={disabled || final}
           />
         </div>
 
@@ -97,7 +118,7 @@ export default function SubmissionForm({
             onChange={(e) => setDocUrl(e.target.value)}
             placeholder="https://drive.google.com/your-doc"
             type="url"
-            disabled={final}
+            disabled={disabled || final}
           />
         </div>
 
@@ -109,7 +130,7 @@ export default function SubmissionForm({
             onChange={(e) => setOverview(e.target.value)}
             placeholder="Brief description of your project..."
             rows={4}
-            disabled={final}
+            disabled={disabled || final}
             className="resize-none"
           />
         </div>
@@ -119,16 +140,32 @@ export default function SubmissionForm({
         <Button
           onClick={handleFinalSubmit}
           disabled={!canSubmit || final}
-          className="w-full"
+          className="flex-1"
           size="lg"
         >
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {final
-            ? "Submitted Successfully"
+            ? isEditing
+              ? "Updated Successfully"
+              : "Submitted Successfully"
             : isLoading
-              ? "Submitting..."
-              : "Final Submit"}
+              ? isEditing
+                ? "Updating..."
+                : "Submitting..."
+              : isEditing
+                ? "Save Changes"
+                : "Final Submit"}
         </Button>
+        {isEditing && onCancel && (
+          <Button
+            onClick={onCancel}
+            variant="outline"
+            size="lg"
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );

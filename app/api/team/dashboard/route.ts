@@ -5,6 +5,9 @@
  *  - team_name, track
  *  - current active round (name, timer, status)
  *  - round instructions
+ *  - current round subtask selection
+ *  - current round submission
+ *  - all scores from previous rounds
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +16,9 @@ import { getTeamSession } from "@/lib/getTeamSession";
 import Team from "@/models/Team";
 import Round from "@/models/Round";
 import Score from "@/models/Score";
+import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
+import Submission from "@/models/Submission";
+import Subtask from "@/models/Subtask";
 
 export async function GET(request: NextRequest) {
   try {
@@ -82,6 +88,60 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Fetch current round subtask selection
+    let currentRoundSubtask = null;
+    if (activeRound) {
+      const selection = await TeamSubtaskSelection.findOne({
+        team_id: teamId,
+        round_id: activeRound._id,
+      }).populate("subtask_id");
+
+      if (selection && selection.subtask_id) {
+        const subtask = selection.subtask_id as any;
+        currentRoundSubtask = {
+          _id: subtask._id,
+          title: subtask.title,
+          description: subtask.description,
+          track: subtask.track,
+          statement: subtask.statement,
+        };
+      }
+    }
+
+    // Fetch current round submission
+    let currentRoundSubmission = null;
+    if (activeRound) {
+      const submission = await Submission.findOne({
+        team_id: teamId,
+        round_id: activeRound._id,
+      });
+
+      if (submission) {
+        currentRoundSubmission = {
+          _id: submission._id,
+          file_url: submission.file_url,
+          github_link: submission.github_link,
+          submission_text: submission.overview,
+          submitted_at: submission.submitted_at,
+        };
+      }
+    }
+
+    // Fetch all round scores (current + previous)
+    const allRoundScores = await Score.find({
+      team_id: teamId,
+      round_id: { $in: accessibleRoundIds },
+    })
+      .populate("round_id", "round_number")
+      .sort({ round_id: 1 });
+
+    const roundScores = allRoundScores.map((score) => ({
+      round_number: (score.round_id as any)?.round_number || "Unknown",
+      score: score.score,
+      status: score.status,
+      remarks: score.remarks,
+    }));
+
     return NextResponse.json({
       team_name: team.team_name,
       track: team.track,
@@ -96,9 +156,12 @@ export async function GET(request: NextRequest) {
             instructions: activeRound.instructions,
           }
         : null,
+      current_round_subtask: currentRoundSubtask,
+      current_round_submission: currentRoundSubmission,
       current_round_score: currentRoundScore,
       total_score: totalScore,
       latest_round_score: latestRoundScore,
+      all_round_scores: roundScores,
       rounds_accessible: accessibleRoundIds,
     });
 

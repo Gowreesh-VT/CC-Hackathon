@@ -7,10 +7,12 @@ import { ExternalLink } from "lucide-react";
 import { useGetTeamSubmissionsQuery } from "@/lib/redux/api/teamApi";
 import { LoadingState } from "@/components/loading-state";
 import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
+import { ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function TeamSubmissionsPage() {
   const { data: submissions = [], isLoading: loading } =
     useGetTeamSubmissionsQuery();
+  console.log("Fetched submissions:", submissions); // Debug log
 
   // Set breadcrumbs for team submissions
   useEffect(() => {
@@ -69,7 +71,9 @@ export default function TeamSubmissionsPage() {
                     <th className="px-6 py-3">Submitted At</th>
                     <th className="px-6 py-3">Links</th>
                     <th className="px-6 py-3">Overview</th>
+                    <th className="px-6 py-3">Score</th>
                     <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -90,7 +94,7 @@ export default function TeamSubmissionsPage() {
                         <div className="flex flex-col gap-1">
                           {sub.github_link && (
                             <a
-                              href={sub.github_link}
+                              href={ensureAbsoluteUrl(sub.github_link)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-lime-400 hover:underline"
@@ -100,7 +104,7 @@ export default function TeamSubmissionsPage() {
                           )}
                           {sub.file_url && (
                             <a
-                              href={sub.file_url}
+                              href={ensureAbsoluteUrl(sub.file_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-blue-400 hover:underline"
@@ -117,12 +121,40 @@ export default function TeamSubmissionsPage() {
                         {sub.overview || "-"}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge
-                          variant="outline"
-                          className="bg-green-500/10 text-green-500 border-green-500/20"
-                        >
-                          Submitted
-                        </Badge>
+                        {sub.score ? (
+                          <span className="font-semibold text-green-400">
+                            {sub.score.score}/10
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {sub.score ? (
+                          <Badge
+                            variant="outline"
+                            className={
+                              sub.score.status === "scored"
+                                ? "bg-green-500/10 text-green-500 border-green-500/20"
+                                : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                            }
+                          >
+                            {sub.score.status}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="bg-gray-500/10 text-gray-500 border-gray-500/20"
+                          >
+                            Pending
+                          </Badge>
+                        )}
+                      </td>
+                      <td
+                        className="px-6 py-4 max-w-xs truncate"
+                        title={sub.score?.remarks}
+                      >
+                        {sub.score?.remarks || "-"}
                       </td>
                     </tr>
                   ))}

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useGetTeamRoundDetailsQuery } from "@/lib/redux/api/teamApi";
+import {
+  useGetTeamRoundDetailsQuery,
+  useSelectSubtaskMutation,
+} from "@/lib/redux/api/teamApi";
 import SubmissionForm from "@/components/team/SubmissionForm";
 import { useParams } from "next/navigation";
 import { LoadingState } from "@/components/loading-state";
@@ -9,7 +12,8 @@ import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, AlertCircle, Trophy, Timer } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, Timer } from "lucide-react";
+import { ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function Page() {
   const params = useParams();
@@ -18,8 +22,11 @@ export default function Page() {
     null,
   );
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const [isEditingSubmission, setIsEditingSubmission] = useState(false);
 
   const { data, isLoading, error } = useGetTeamRoundDetailsQuery(id);
+  const [selectSubtask, { isLoading: isSelecting }] =
+    useSelectSubtaskMutation();
 
   // Set breadcrumbs for team round details
   useEffect(() => {
@@ -117,13 +124,33 @@ export default function Page() {
   if (selection) {
     return (
       <div className="space-y-8">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Round {round.round_number}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage your submission and track progress
-          </p>
+        <header className="flex justify-between w-full items-start">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Round {round.round_number}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage your submission and track progress
+            </p>
+          </div>
+          {/* Countdown Timer */}
+          <div className="rounded-lg border border-border/50 bg-muted/30 p-4 shrink-0 ml-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Timer className="h-4 w-4 text-yellow-600" />
+              <p className="text-xs font-medium text-muted-foreground">
+                TIME REMAINING
+              </p>
+            </div>
+            <p
+              className={`text-lg font-bold whitespace-nowrap ${
+                timeRemaining === "Time's up!"
+                  ? "text-red-600"
+                  : "text-yellow-600"
+              }`}
+            >
+              {timeRemaining || "Calculating..."}
+            </p>
+          </div>
         </header>
 
         {/* Round Details */}
@@ -134,11 +161,11 @@ export default function Page() {
           <CardContent>
             <div className="space-y-4">
               {round.instructions && (
-                <div>
+                <div className="w-full">
                   <p className="text-xs font-medium text-muted-foreground mb-2">
                     INSTRUCTIONS
                   </p>
-                  <p className="text-sm text-foreground">
+                  <p className="text-sm text-foreground w-full">
                     {round.instructions}
                   </p>
                 </div>
@@ -167,25 +194,6 @@ export default function Page() {
                     </p>
                   </div>
                 </div>
-              </div>
-
-              {/* Countdown Timer */}
-              <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Timer className="h-4 w-4 text-yellow-600" />
-                  <p className="text-xs font-medium text-muted-foreground">
-                    TIME REMAINING
-                  </p>
-                </div>
-                <p
-                  className={`text-lg font-bold ${
-                    timeRemaining === "Time's up!"
-                      ? "text-red-600"
-                      : "text-yellow-600"
-                  }`}
-                >
-                  {timeRemaining || "Calculating..."}
-                </p>
               </div>
             </div>
           </CardContent>
@@ -233,47 +241,6 @@ export default function Page() {
           </Card>
         )}
 
-        {/* Score Card - Show if score exists */}
-        {score && (
-          <Card className="border-green-500/20 bg-card/80">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-green-600" />
-                Your Score
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    SCORE
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {score.score}/10
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Status:{" "}
-                    <Badge variant="secondary" className="ml-1">
-                      {score.status}
-                    </Badge>
-                  </p>
-                </div>
-
-                {score.remarks && (
-                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                      JUDGE REMARKS
-                    </p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {score.remarks}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Submission Section */}
         {submission ? (
           <Card>
@@ -287,48 +254,130 @@ export default function Page() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {submission.github_link && (
-                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                      GITHUB REPOSITORY
-                    </p>
-                    <a
-                      href={submission.github_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline break-all"
-                    >
-                      {submission.github_link}
-                    </a>
+              {!isEditingSubmission ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {submission.github_link && (
+                      <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          GITHUB REPOSITORY
+                        </p>
+                        <a
+                          href={ensureAbsoluteUrl(submission.github_link)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline break-all"
+                        >
+                          {submission.github_link}
+                        </a>
+                      </div>
+                    )}
+                    {submission.file_url && (
+                      <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          FILE / DOCUMENT
+                        </p>
+                        <a
+                          href={ensureAbsoluteUrl(submission.file_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                        >
+                          View Document
+                        </a>
+                      </div>
+                    )}
                   </div>
-                )}
-                {submission.file_url && (
-                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                      FILE / DOCUMENT
-                    </p>
-                    <a
-                      href={submission.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      View Document
-                    </a>
-                  </div>
-                )}
-              </div>
 
-              {submission.submission_text && (
-                <div className="pt-4 border-t border-border rounded-lg border-b border-l border-r border-border/50 bg-muted/30 p-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    SUBMISSION TEXT
+                  {submission.overview && (
+                    <div className="pt-4 border-t rounded-lg border-b border-l border-r border-border/50 bg-muted/30 p-4">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        PROJECT OVERVIEW
+                      </p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {submission.overview}
+                      </p>
+                    </div>
+                  )}
+
+                  {score && (
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-xs font-medium text-muted-foreground mb-3">
+                        EVALUATION
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            SCORE
+                          </p>
+                          <p className="text-2xl font-bold text-foreground">
+                            {score.score}/10
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Status:{" "}
+                            <Badge variant="secondary" className="ml-1">
+                              {score.status}
+                            </Badge>
+                          </p>
+                        </div>
+
+                        {score.remarks && (
+                          <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                              JUDGE REMARKS
+                            </p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {score.remarks}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isRoundEnded && (
+                    <div className="flex gap-2 pt-4 border-t border-border">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingSubmission(true)}
+                      >
+                        Edit Submission
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Update your submission below
                   </p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">
-                    {submission.submission_text}
-                  </p>
-                </div>
+
+                  {submission.submission_text && (
+                    <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 p-4">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        CURRENT PROJECT OVERVIEW
+                      </p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {submission.submission_text}
+                      </p>
+                    </div>
+                  )}
+
+                  <SubmissionForm
+                    subtask={{
+                      id: subtask?._id || "",
+                      title: subtask?.title || "",
+                    }}
+                    roundId={id}
+                    allowFileUpload={true}
+                    disabled={isRoundEnded}
+                    isEditing={true}
+                    submission={submission}
+                    onSuccess={() => setIsEditingSubmission(false)}
+                    onCancel={() => setIsEditingSubmission(false)}
+                  />
+                </>
               )}
             </CardContent>
           </Card>
@@ -362,6 +411,7 @@ export default function Page() {
                   }}
                   roundId={id}
                   allowFileUpload={true}
+                  disabled={isRoundEnded}
                 />
               )}
             </CardContent>
@@ -374,13 +424,33 @@ export default function Page() {
   // If no subtask selected - show subtask options
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Round {round.round_number} - Select Subtask
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Choose a subtask to work on for this round
-        </p>
+      <header className="flex justify-between w-full items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Round {round.round_number} - Select Subtask
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose a subtask to work on for this round
+          </p>
+        </div>
+        {/* Countdown Timer */}
+        <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Timer className="h-4 w-4 text-yellow-600" />
+            <p className="text-xs font-medium text-muted-foreground">
+              TIME REMAINING
+            </p>
+          </div>
+          <p
+            className={`text-lg font-bold ${
+              timeRemaining === "Time's up!"
+                ? "text-red-600"
+                : "text-yellow-600"
+            }`}
+          >
+            {timeRemaining || "Calculating..."}
+          </p>
+        </div>
       </header>
 
       {/* Round Details */}
@@ -397,7 +467,6 @@ export default function Page() {
               <p className="text-sm text-foreground">{round.instructions}</p>
             </div>
           )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
               <p className="text-xs font-medium text-muted-foreground mb-2">
@@ -421,26 +490,7 @@ export default function Page() {
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Countdown Timer */}
-          <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Timer className="h-4 w-4 text-yellow-600" />
-              <p className="text-xs font-medium text-muted-foreground">
-                TIME REMAINING
-              </p>
-            </div>
-            <p
-              className={`text-lg font-bold ${
-                timeRemaining === "Time's up!"
-                  ? "text-red-600"
-                  : "text-yellow-600"
-              }`}
-            >
-              {timeRemaining || "Calculating..."}
-            </p>
-          </div>
+          </div>{" "}
         </CardContent>
       </Card>
 
@@ -497,13 +547,19 @@ export default function Page() {
             <div className="mt-6">
               <Button
                 size="lg"
-                onClick={() => {
-                  // This should integrate with your selection API
-                  // For now, you may need to implement the selection submission
-                  console.log("Selected subtask:", selectedSubtaskId);
+                onClick={async () => {
+                  try {
+                    await selectSubtask({
+                      roundId: id,
+                      subtaskId: selectedSubtaskId,
+                    }).unwrap();
+                  } catch (error) {
+                    console.error("Failed to select subtask:", error);
+                  }
                 }}
+                disabled={isSelecting}
               >
-                Confirm Selection
+                {isSelecting ? "Confirming..." : "Confirm Selection"}
               </Button>
             </div>
           )}

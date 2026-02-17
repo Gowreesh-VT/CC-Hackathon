@@ -106,27 +106,27 @@ export default function Page() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {round.subtask_selected ? (
+                          {round.has_selected ? (
                             <CheckCircle className="h-4 w-4 text-green-600" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-yellow-600" />
                           )}
                           <span className="text-sm">
-                            {round.subtask_selected
-                              ? "Selected"
-                              : "Not Selected"}
+                            {round.has_selected ? "Selected" : "Not Selected"}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {round.submitted ? (
+                          {round.has_submitted ? (
                             <CheckCircle className="h-4 w-4 text-green-600" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-yellow-600" />
                           )}
                           <span className="text-sm">
-                            {round.submitted ? "Submitted" : "Not Submitted"}
+                            {round.has_submitted
+                              ? "Submitted"
+                              : "Not Submitted"}
                           </span>
                         </div>
                       </TableCell>

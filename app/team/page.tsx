@@ -8,8 +8,8 @@ import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, AlertCircle, Trophy } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Clock, CheckCircle, AlertCircle, Trophy, Timer } from "lucide-react";
+import { cn, ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function TeamDashboardPage() {
   const { data: dashboardData, isLoading } = useGetTeamDashboardQuery();
@@ -71,10 +71,10 @@ export default function TeamDashboardPage() {
             <CardTitle className="text-sm font-medium">
               Time Remaining
             </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Timer className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-medium">
+            <div className="text-2xl font-bold text-yellow-600">
               <CountDown endTime={endTime} />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -132,7 +132,7 @@ export default function TeamDashboardPage() {
       {latestRoundScore && (
         <Card
           className={cn(
-            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm"
+            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
           )}
         >
           <CardHeader>
@@ -158,7 +158,9 @@ export default function TeamDashboardPage() {
                     STATUS
                   </p>
                   <Badge variant="default">
-                    {latestRoundScore.status === "scored" ? "Evaluated" : "Pending"}
+                    {latestRoundScore.status === "scored"
+                      ? "Evaluated"
+                      : "Pending"}
                   </Badge>
                 </div>
               </div>
@@ -186,6 +188,7 @@ export default function TeamDashboardPage() {
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
             Current Round Subtask
           </CardTitle>
         </CardHeader>
@@ -193,13 +196,28 @@ export default function TeamDashboardPage() {
           {currentRoundSubtask ? (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-semibold text-foreground">
                   {currentRoundSubtask.title}
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
                   {currentRoundSubtask.description}
                 </p>
+                {currentRoundSubtask.track && (
+                  <Badge variant="secondary" className="mt-3">
+                    {currentRoundSubtask.track}
+                  </Badge>
+                )}
               </div>
+              {currentRoundSubtask.statement && (
+                <div className="pt-4 border-t border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    PROBLEM STATEMENT
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {currentRoundSubtask.statement}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Link href={`/team/rounds/${activeRound?._id}`}>
                   <Button size="sm" variant="outline">
@@ -213,9 +231,13 @@ export default function TeamDashboardPage() {
               <p className="text-sm text-muted-foreground">
                 No subtask selected for this round.
               </p>
-              <Link href={`/team/rounds/${activeRound?._id}`}>
-                <Button size="sm">Select a Subtask</Button>
-              </Link>
+              {activeRound?._id ? (
+                <Link href={`/team/rounds/${activeRound._id}`}>
+                  <Button size="sm">Select a Subtask</Button>
+                </Link>
+              ) : (
+                <Badge variant="secondary">No active round</Badge>
+              )}
             </div>
           )}
         </CardContent>
@@ -229,6 +251,7 @@ export default function TeamDashboardPage() {
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
             Current Round Submission
           </CardTitle>
         </CardHeader>
@@ -238,30 +261,32 @@ export default function TeamDashboardPage() {
               <div className="grid gap-4">
                 {currentRoundSubmission.file_url && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">
-                      FILE
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      FILE / DOCUMENT
                     </p>
                     <a
-                      href={currentRoundSubmission.file_url}
+                      href={ensureAbsoluteUrl(currentRoundSubmission.file_url)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline break-all"
+                      className="text-sm text-primary hover:underline break-all"
                     >
-                      {currentRoundSubmission.file_url}
+                      View Document
                     </a>
                   </div>
                 )}
 
                 {currentRoundSubmission.github_link && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">
-                      GITHUB LINK
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      GITHUB REPOSITORY
                     </p>
                     <a
-                      href={currentRoundSubmission.github_link}
+                      href={ensureAbsoluteUrl(
+                        currentRoundSubmission.github_link,
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline break-all"
+                      className="text-sm text-primary hover:underline break-all"
                     >
                       {currentRoundSubmission.github_link}
                     </a>
@@ -270,7 +295,7 @@ export default function TeamDashboardPage() {
 
                 {currentRoundSubmission.submission_text && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
                       SUBMISSION TEXT
                     </p>
                     <p className="text-sm text-foreground whitespace-pre-wrap">
@@ -278,6 +303,21 @@ export default function TeamDashboardPage() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                Submitted on{" "}
+                {currentRoundSubmission.submitted_at
+                  ? new Date(
+                      currentRoundSubmission.submitted_at,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "-"}
               </div>
 
               {activeRound?.submission_enabled && (
@@ -306,6 +346,76 @@ export default function TeamDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* All Round Scores Card */}
+      {dashboardData?.all_round_scores &&
+        dashboardData.all_round_scores.length > 0 && (
+          <Card
+            className={cn(
+              "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
+            )}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-600" />
+                All Round Scores
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {dashboardData.all_round_scores.map(
+                  (roundScore: any, index: number) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-border/50 bg-muted/30 p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-foreground">
+                            Round {roundScore.round_number}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              SCORE
+                            </p>
+                            <p className="text-lg font-bold text-foreground">
+                              {roundScore.score !== null
+                                ? `${roundScore.score}/10`
+                                : "-"}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              roundScore.status === "scored"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {roundScore.status === "scored"
+                              ? "Evaluated"
+                              : "Pending"}
+                          </Badge>
+                        </div>
+                      </div>
+                      {roundScore.remarks && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            JUDGE REMARKS
+                          </p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">
+                            {roundScore.remarks}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
     </div>
   );
 }

@@ -44,28 +44,31 @@ export default function Countdown({ endTime }: CountdownProps) {
     return () => clearInterval(id);
   }, [endTime]);
 
+  // Format the time remaining string
+  const formatTimeRemaining = () => {
+    const { days, hours, minutes, seconds } = remaining;
+    let timeStr = "";
+    if (days > 0) timeStr += `${days}d `;
+    if (hours > 0) timeStr += `${hours}h `;
+    if (minutes > 0) timeStr += `${minutes}m `;
+    timeStr += `${seconds}s`;
+    return timeStr;
+  };
+
   return (
-    <div className="flex gap-3 items-center text-center text-sm md:text-base">
-      <TimeUnit value={remaining.days} label="d" />
-      <Separator />
-      <TimeUnit value={remaining.hours} label="h" />
-      <Separator />
-      <TimeUnit value={remaining.minutes} label="m" />
-      <Separator />
-      <TimeUnit value={remaining.seconds} label="s" />
-    </div>
+    <span className="font-bold text-foreground">{formatTimeRemaining()}</span>
   );
 }
 
 function TimeUnit({ value, label }: { value: number; label: string }) {
   return (
-    <div className="min-w-[3.5rem] bg-gradient-to-br from-gray-800 via-neutral-900 to-black px-3 py-2 rounded-lg font-mono text-white shadow">
+    <div className="min-w-[3.5rem] bg-muted px-3 py-2 rounded-lg font-mono text-foreground shadow">
       <div className="text-2xl font-bold">{String(value).padStart(2, "0")}</div>
-      <div className="text-xs text-gray-400">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }
 
 function Separator() {
-  return <div className="text-gray-500">:</div>;
+  return <div className="text-muted-foreground">:</div>;
 }

@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
+import { ensureAbsoluteUrl } from "@/lib/utils";
 
 // Define types
 type TeamEvaluation = {
@@ -314,27 +315,70 @@ export default function JudgeRoundDetailsPage() {
         open={!!selectedTeamId}
         onOpenChange={(open) => !open && handleCloseDialog()}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Evaluate {selectedTeam?.teamName} - {selectedTeam?.taskName}
-            </DialogTitle>
+            <DialogTitle>Evaluate {selectedTeam?.teamName}</DialogTitle>
           </DialogHeader>
+
+          {/* Task Details */}
+          {selectedTeam?.selected_subtask && (
+            <div className="space-y-4 border rounded-lg p-4 bg-blue-500/5 border-blue-500/20">
+              <h3 className="font-semibold text-sm text-foreground">
+                Assigned Task
+              </h3>
+
+              {/* Task Title */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  TASK TITLE
+                </p>
+                <p className="text-lg font-semibold text-foreground">
+                  {selectedTeam.selected_subtask.title}
+                </p>
+              </div>
+
+              {/* Track */}
+              {selectedTeam.selected_subtask.track && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    TRACK
+                  </p>
+                  <Badge variant="secondary">
+                    {selectedTeam.selected_subtask.track}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedTeam.selected_subtask.description && (
+                <div className="max-h-25 overflow-auto">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    DESCRIPTION
+                  </p>
+                  <p className="text-sm text-foreground">
+                    {selectedTeam.selected_subtask.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Problem Statement */}
+              {selectedTeam.selected_subtask.statement && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    PROBLEM STATEMENT
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {selectedTeam.selected_subtask.statement}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Submission Details */}
           {selectedTeam && (
             <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
               <h3 className="font-semibold text-sm">Submission Details</h3>
-
-              {/* Task */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  CHOSEN TASK
-                </p>
-                <p className="text-sm">
-                  {selectedTeam.selected_subtask?.title || "No task selected"}
-                </p>
-              </div>
 
               {/* Submitted Files */}
               {selectedTeam.submission?.file_url && (
@@ -343,7 +387,7 @@ export default function JudgeRoundDetailsPage() {
                     SUBMITTED FILE
                   </p>
                   <a
-                    href={selectedTeam.submission.file_url}
+                    href={ensureAbsoluteUrl(selectedTeam.submission.file_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:underline break-all"
@@ -360,7 +404,9 @@ export default function JudgeRoundDetailsPage() {
                     GITHUB LINK
                   </p>
                   <a
-                    href={selectedTeam.submission.github_link}
+                    href={ensureAbsoluteUrl(
+                      selectedTeam.submission.github_link,
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:underline break-all"
@@ -374,7 +420,7 @@ export default function JudgeRoundDetailsPage() {
               {selectedTeam.submission?.submission_text && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-1">
-                    SUBMISSION TEXT
+                    PROJECT OVERVIEW
                   </p>
                   <p className="text-sm whitespace-pre-wrap">
                     {selectedTeam.submission.submission_text}
