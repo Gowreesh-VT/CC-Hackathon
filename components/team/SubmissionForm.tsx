@@ -2,18 +2,35 @@
 
 import React, { useState } from "react";
 import type { SubtaskSummary } from "./SubtaskCard";
-import { useSubmitProjectMutation } from "@/lib/redux/api/teamApi";
+import {
+  useSubmitProjectMutation,
+  useUpdateSubmissionMutation,
+} from "@/lib/redux/api/teamApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 type Props = {
   subtask: SubtaskSummary;
   allowFileUpload?: boolean;
   roundId?: string | undefined;
+  isEditing?: boolean;
+  disabled?: boolean;
+  submission?: {
+    github_link?: string;
+    file_url?: string;
+    overview?: string;
+  };
   onFinalSubmitted?: (payload: {
     subtaskId: string;
     githubUrl?: string;
     docUrl?: string;
     fileName?: string;
   }) => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
 export default function SubmissionForm({
@@ -21,21 +38,30 @@ export default function SubmissionForm({
   onFinalSubmitted,
   allowFileUpload,
   roundId,
+  isEditing = false,
+  disabled = false,
+  submission,
+  onSuccess,
+  onCancel,
 }: Props) {
-  const [githubUrl, setGithubUrl] = useState("");
-  const [docUrl, setDocUrl] = useState("");
-  const [overview, setOverview] = useState("");
+  const [githubUrl, setGithubUrl] = useState(submission?.github_link || "");
+  const [docUrl, setDocUrl] = useState(submission?.file_url || "");
+  const [overview, setOverview] = useState(submission?.overview || "");
   const [busy, setBusy] = useState(false);
   const [final, setFinal] = useState(false);
 
-  // RTK Query hook
-  const [submitProject, { isLoading }] = useSubmitProjectMutation();
+  // RTK Query hooks
+  const [submitProject, { isLoading: isSubmitting }] =
+    useSubmitProjectMutation();
+  const [updateSubmission, { isLoading: isUpdating }] =
+    useUpdateSubmissionMutation();
 
+  const isLoading = isSubmitting || isUpdating;
   const canSubmit = (githubUrl || docUrl) && !isLoading && !final;
 
   async function handleFinalSubmit() {
     if (!canSubmit) return;
-    
+
     try {
       const payload = {
         roundId: roundId ?? "",
@@ -45,16 +71,24 @@ export default function SubmissionForm({
         overview: overview,
       };
 
-      await submitProject(payload).unwrap();
-      
+      if (isEditing) {
+        await updateSubmission(payload).unwrap();
+      } else {
+        await submitProject(payload).unwrap();
+      }
+
       setFinal(true);
-      onFinalSubmitted?.({ 
-          subtaskId: subtask.id, 
-          githubUrl, 
+
+      if (isEditing && onSuccess) {
+        onSuccess();
+      } else {
+        onFinalSubmitted?.({
+          subtaskId: subtask.id,
+          githubUrl,
           docUrl,
-          fileName: overview ? "Overview provided" : undefined
-      });
-      
+          fileName: overview ? "Overview provided" : undefined,
+        });
+      }
     } catch (e: any) {
       console.error(e);
       alert("Submission failed: " + (e?.data?.error || "Unknown error"));
@@ -62,61 +96,76 @@ export default function SubmissionForm({
   }
 
   return (
-    <div className="mt-4 w-full max-w-2xl">
-      <div className="p-4 rounded-lg bg-neutral-900 border border-neutral-800">
-        <div className="text-sm text-gray-300">Submitting for</div>
-        <div className="font-semibold text-white">{subtask.title}</div>
-
-        <label className="block mt-4">
-          <div className="text-xs text-gray-400">GitHub URL</div>
-          <input
+    <div className="w-full space-y-6">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="github-url">GitHub Repository URL</Label>
+          <Input
+            id="github-url"
             value={githubUrl}
             onChange={(e) => setGithubUrl(e.target.value)}
             placeholder="https://github.com/your-repo"
-            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none"
+            type="url"
+            disabled={disabled || final}
           />
-        </label>
+        </div>
 
-        <label className="block mt-3">
-          <div className="text-xs text-gray-400">Presentation Link / Document URL</div>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="doc-url">Presentation Link / Document URL</Label>
+          <Input
+            id="doc-url"
             value={docUrl}
             onChange={(e) => setDocUrl(e.target.value)}
             placeholder="https://drive.google.com/your-doc"
-            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none"
+            type="url"
+            disabled={disabled || final}
           />
-        </label>
+        </div>
 
-        <label className="block mt-3">
-          <div className="text-xs text-gray-400">Project Overview (Optional)</div>
-          <textarea
+        <div className="space-y-2">
+          <Label htmlFor="overview">Project Overview (Optional)</Label>
+          <Textarea
+            id="overview"
             value={overview}
             onChange={(e) => setOverview(e.target.value)}
             placeholder="Brief description of your project..."
-            rows={3}
-            className="mt-1 w-full px-3 py-2 rounded bg-neutral-800 border border-neutral-700 text-white focus:ring-1 focus:ring-lime-500 outline-none resize-none"
+            rows={4}
+            disabled={disabled || final}
+            className="resize-none"
           />
-        </label>
-
-        <div className="mt-4 flex gap-3">
-          <button
-            onClick={handleFinalSubmit}
-            disabled={!canSubmit}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              final
-                ? "bg-gray-600 text-white cursor-default"
-                : canSubmit 
-                    ? "bg-lime-500 hover:bg-lime-600 text-black"
-                    : "bg-gray-700 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {final
-              ? "Submitted Successfully"
-              : isLoading
-              ? "Submitting..."
-              : "Final Submit"}
-          </button>
         </div>
+      </div>
+
+      <div className="flex gap-3">
+        <Button
+          onClick={handleFinalSubmit}
+          disabled={!canSubmit || final}
+          className="flex-1"
+          size="lg"
+        >
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {final
+            ? isEditing
+              ? "Updated Successfully"
+              : "Submitted Successfully"
+            : isLoading
+              ? isEditing
+                ? "Updating..."
+                : "Submitting..."
+              : isEditing
+                ? "Save Changes"
+                : "Final Submit"}
+        </Button>
+        {isEditing && onCancel && (
+          <Button
+            onClick={onCancel}
+            variant="outline"
+            size="lg"
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );

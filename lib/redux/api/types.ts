@@ -45,8 +45,21 @@ export type AdminDashboard = {
   currentRoundId: string | null;
   submissionsCount: number;
   pendingEvaluationCount: number;
-  roundStatus: "idle" | "active" | "paused" | "closed";
+  roundStatus:
+    | "idle"
+    | "active"
+    | "paused"
+    | "closed"
+    | "inactive"
+    | "upcoming"
+    | "completed";
   submissionEnabled: boolean;
+  topTeams?: Array<{
+    id: string;
+    name: string;
+    cumulativeScore: number;
+    track: string;
+  }>;
 };
 
 export type Subtask = {
@@ -69,6 +82,11 @@ export type TeamDetail = {
   isShortlisted?: boolean;
   isLocked?: boolean;
   isEliminated?: boolean;
+  roundScores?: Array<{
+    roundId: string;
+    roundNumber: number;
+    score: number | null;
+  }>;
 };
 
 export type RoundTeamSelection = {

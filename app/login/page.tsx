@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,42 +18,42 @@ type Role = "team" | "judge" | "admin";
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const toastShownRef = useRef(false);
 
+  const errorMessage = useMemo(() => {
+    const error = searchParams.get("error");
+    if (error === "user-not-found") {
+      return "No account found for this email. Contact an admin.";
+    }
+    return null;
+  }, [searchParams]);
+
+  // Redirect authenticated users based on role
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role) {
-      if (session.user.role === "admin") {
-        router.push("/admin/judges");
-      } else if (session.user.role === "judge") {
-        router.push("/judge");
-      } else if (session.user.role === "team") {
-        router.push("/team/dashboard");
-      }
+      const role = session.user.role as Role;
+      const redirectMap: Record<Role, string> = {
+        admin: "/admin/judges",
+        judge: "/judge",
+        team: "/team",
+      };
+      router.replace(redirectMap[role]);
     }
   }, [status, session, router]);
 
-  // Default role = Team (as agreed)
-  const [selectedRole, setSelectedRole] = useState<Role>("team");
+  // Show error toast only if not authenticated and there's an error
+  useEffect(() => {
+    if (!errorMessage || toastShownRef.current || status === "authenticated") {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      toast.error(errorMessage);
+      toastShownRef.current = true;
+    }, 0);
 
-  const roleContent = {
-    team: {
-      title: "Team Login",
-      description:
-        "Team leaders sign in using Google. Each team is mapped to a unique Team ID after authentication.",
-      buttonText: "Continue as Team",
-    },
-    judge: {
-      title: "Judge Login",
-      description:
-        "Judges authenticate using Google OAuth to review team submissions and provide scores.",
-      buttonText: "Continue as Judge",
-    },
-    admin: {
-      title: "Admin Login",
-      description:
-        "Organizers and administrators use Google OAuth to manage teams, rounds, and event flow.",
-      buttonText: "Continue as Admin",
-    },
-  };
+    return () => window.clearTimeout(timeoutId);
+  }, [errorMessage, status]);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-6 py-16">
@@ -63,63 +64,28 @@ export default function LoginPage() {
           </CardTitle>
 
           <CardDescription className="text-center">
-            Select your role to access the hackathon platform.
+            Use your Google account to access the hackathon platform.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-8">
-          {/* Role Selector */}
-          <div className="grid grid-cols-3 gap-3">
-            {(["team", "judge", "admin"] as Role[]).map((role) => (
-              <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
-                className={`rounded-lg border p-4 text-sm font-medium transition
-                  ${
-                    selectedRole === role
-                      ? "border-primary bg-primary/10"
-                      : "hover:bg-muted"
-                  }`}
-              >
-                {/* 
-                  Optional: Role icon/image placeholder
-                  You can add an <img /> or icon here later if needed 
-                */}
-                <div className="flex items-center justify-center gap-2">
-                  <img
-                    src={`/login_icons/${role}.svg`}
-                    alt=""
-                    className="h-5 w-5 invert opacity-80"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
-                    }}
-                  />
-                  <p className="capitalize">{role}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Selected Role Content */}
+        <CardContent>
           <div className="rounded-xl border p-6 space-y-3">
-            {/* 
-              Optional: Large image / illustration placeholder
-              You can add an image here later based on selected role 
-            */}
-            <p className="text-base font-semibold">
-              {roleContent[selectedRole].title}
-            </p>
+            <p className="text-base font-semibold">Continue with Google</p>
             <p className="text-sm text-muted-foreground">
-              {roleContent[selectedRole].description}
+              Your role is detected automatically after authentication.
             </p>
+            {errorMessage ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {errorMessage}
+              </p>
+            ) : null}
 
             <Button
               size="lg"
               className="mt-2 w-full transition-colors duration-200 hover:bg-blue-600 hover:text-white"
               onClick={() => signIn("google")}
             >
-              {roleContent[selectedRole].buttonText}
+              Sign in with Google
             </Button>
           </div>
         </CardContent>

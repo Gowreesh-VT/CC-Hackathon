@@ -44,17 +44,16 @@ export const navConfig: Record<Role, SidebarNavItem[]> = {
       href: "/judge",
       icon: LayoutDashboard,
     },
-    // Add more judge routes as needed, based on requirements
     {
-      title: "Assigned Teams",
-      href: "/judge/teams",
-      icon: Users,
+      title: "Rounds",
+      href: "/judge/rounds",
+      icon: ListOrdered,
     },
   ],
   team: [
     {
       title: "Dashboard",
-      href: "/team/dashboard",
+      href: "/team",
       icon: LayoutDashboard,
     },
     {

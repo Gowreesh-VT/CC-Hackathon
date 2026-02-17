@@ -29,24 +29,42 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
+    async signIn({ user }) {
+      if (!user?.email) {
+        return "/login?error=user-not-found";
+      }
+
+      await connectDB();
+      const dbUser = await User.findOne({ email: user.email });
+      console.log("DB User:", dbUser);
+
+      if (!dbUser) {
+        return "/login?error=user-not-found";
+      }
+
+      return true;
+    },
     async jwt({ token, user }) {
-      if (user && user.email) {
+      if (user) {
+        token.email = user.email;
+      }
+
+      if (token.email) {
         await connectDB();
-        const dbUser = await User.findOne({ email: user.email });
+        const dbUser = await User.findOne({ email: token.email });
 
         if (dbUser) {
           token.role = dbUser.role;
           token.team_id = dbUser.team_id?.toString();
-        } else {
-          token.role = "team";
         }
       }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role;
-        session.user.team_id = token.team_id;
+        session.user.role = token.role as string;
+        session.user.team_id = token.team_id as string | undefined;
       }
       return session;
     },

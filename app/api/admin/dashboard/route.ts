@@ -18,7 +18,9 @@ export async function GET() {
     // If no active round, get the upcoming one or the last ended one
     if (!currentRound) {
       // Try to find one that hasn't started yet
-      currentRound = await Round.findOne({ start_time: { $gt: new Date() } }).sort({ start_time: 1 });
+      currentRound = await Round.findOne({
+        start_time: { $gt: new Date() },
+      }).sort({ start_time: 1 });
 
       // If no upcoming, get the last one
       if (!currentRound) {
@@ -32,42 +34,82 @@ export async function GET() {
 
     if (currentRound) {
       if (currentRound.is_active) roundStatus = "active";
-      else if (currentRound.end_time && new Date() > currentRound.end_time) roundStatus = "completed";
+      else if (currentRound.end_time && new Date() > currentRound.end_time)
+        roundStatus = "completed";
       else roundStatus = "upcoming";
 
       // 3. Submissions for current round
-      submissionsCount = await Submission.countDocuments({ round_id: currentRound._id });
+      submissionsCount = await Submission.countDocuments({
+        round_id: currentRound._id,
+      });
 
       // 4. Pending Evaluations
       // Teams that have submitted but not yet scored
-      const scoredTeamIds = await Score.distinct("team_id", { round_id: currentRound._id });
+      const scoredTeamIds = await Score.distinct("team_id", {
+        round_id: currentRound._id,
+      });
 
       // Count submissions whose team_id is NOT in scoredTeamIds
-      // const pendingCount = await Submission.countDocuments({ 
-      //     round_id: currentRound._id, 
-      //     team_id: { $nin: scoredTeamIds } 
+      // const pendingCount = await Submission.countDocuments({
+      //     round_id: currentRound._id,
+      //     team_id: { $nin: scoredTeamIds }
       // });
 
       // Simple math since 1 submission per team usually
-      pendingEvaluationCount = Math.max(0, submissionsCount - scoredTeamIds.length);
+      pendingEvaluationCount = Math.max(
+        0,
+        submissionsCount - scoredTeamIds.length,
+      );
     }
+
+    // 5. Get top 5 teams based on cumulative score across all rounds
+    const allScores = await Score.find({}).lean();
+
+    // Group scores by team and sum them up
+    const teamsScoreMap = new Map<string, number>();
+    allScores.forEach((score: any) => {
+      const teamId = score.team_id.toString();
+      const currentScore = teamsScoreMap.get(teamId) || 0;
+      teamsScoreMap.set(teamId, currentScore + (score.score || 0));
+    });
+
+    // Convert to array, sort by score descending, and get top 5
+    const topTeams = await Promise.all(
+      Array.from(teamsScoreMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(async ([teamId, cumulativeScore]) => {
+          const team = await Team.findById(teamId).lean();
+          return {
+            id: teamId,
+            name: team?.team_name || "Unknown",
+            cumulativeScore,
+            track: team?.track || "—",
+          };
+        }),
+    );
 
     const stats = {
       totalTeams,
-      currentRound: currentRound ? {
-        id: currentRound._id,
-        name: `Round ${currentRound.round_number}`,
-        round_number: currentRound.round_number
-      } : null,
+      currentRound: currentRound
+        ? {
+            id: currentRound._id,
+            name: `Round ${currentRound.round_number}`,
+            round_number: currentRound.round_number,
+          }
+        : null,
       roundStatus,
       submissionsCount,
       pendingEvaluationCount,
+      topTeams,
     };
 
     return NextResponse.json(stats, { status: 200 });
-
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
-    return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch stats" },
+      { status: 500 },
+    );
   }
 }

@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +24,39 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, ChevronRight, ListOrdered } from "lucide-react";
+import {
+  Plus,
+  ListOrdered,
+  PlayCircle,
+  StopCircle,
+  Upload,
+  Edit,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useGetAdminRoundsQuery, useCreateRoundMutation } from "@/lib/redux/api/adminApi";
+import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
+import {
+  useGetAdminRoundsQuery,
+  useCreateRoundMutation,
+  useToggleRoundStatusMutation,
+  useDeleteRoundMutation,
+} from "@/lib/redux/api/adminApi";
 import { toast } from "sonner";
 
 export default function AdminRoundsPage() {
+  // Set breadcrumbs
+  useEffect(() => {
+    setBreadcrumbs([{ label: "Rounds", href: "/admin/rounds" }]);
+  }, []);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [roundNumber, setRoundNumber] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -30,6 +65,8 @@ export default function AdminRoundsPage() {
 
   const { data: rounds = [], isLoading } = useGetAdminRoundsQuery();
   const [createRound] = useCreateRoundMutation();
+  const [toggleRoundStatus] = useToggleRoundStatusMutation();
+  const [deleteRound] = useDeleteRoundMutation();
 
   const handleCreateRound = async () => {
     if (!roundNumber) return;
@@ -50,8 +87,67 @@ export default function AdminRoundsPage() {
       setEndTime("");
     } catch (e: any) {
       console.error(e);
-      toast.error(`Failed to create round: ${e?.data?.error || "Unknown error"}`);
+      toast.error(
+        `Failed to create round: ${e?.data?.error || "Unknown error"}`,
+      );
     }
+  };
+
+  const handleStartRound = async (roundId: string) => {
+    try {
+      await toggleRoundStatus({
+        id: roundId,
+        action: "start",
+      }).unwrap();
+      toast.success("Round started successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to start round");
+    }
+  };
+
+  const handleStopRound = async (roundId: string) => {
+    try {
+      await toggleRoundStatus({ id: roundId, action: "stop" }).unwrap();
+      toast.success("Round stopped successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to stop round");
+    }
+  };
+
+  const handleToggleSubmission = async (roundId: string) => {
+    try {
+      await toggleRoundStatus({
+        id: roundId,
+        action: "toggle-submission",
+      }).unwrap();
+      toast.success("Submission status updated");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to toggle submission");
+    }
+  };
+
+  const handleDeleteRound = async (roundId: string) => {
+    const confirmed = confirm(
+      "Delete this round? This will also delete related subtasks, submissions, and assignments.",
+    );
+    if (!confirmed) return;
+    try {
+      await deleteRound(roundId).unwrap();
+      toast.success("Round deleted successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to delete round");
+    }
+  };
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString();
   };
 
   return (
@@ -68,7 +164,7 @@ export default function AdminRoundsPage() {
       <Card
         className={cn(
           "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
-          "dark:border-white/10 dark:bg-card/80"
+          "dark:border-white/10 dark:bg-card/80",
         )}
       >
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
@@ -155,44 +251,160 @@ export default function AdminRoundsPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="h-150 overflow-auto rounded-xl border border-border/50">
             {isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading rounds...</p>
+              <p className="text-sm text-muted-foreground">Loading rounds...</p>
             ) : rounds.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No rounds found. Create one to get started.</p>
+              <p className="text-sm text-muted-foreground">
+                No rounds found. Create one to get started.
+              </p>
             ) : (
-                rounds.map((round: any) => (
-                  <Link
-                    key={round._id}
-                    href={`/admin/rounds/${round._id}`}
-                    className={cn(
-                      "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-muted/20 p-4 transition-all",
-                      "hover:border-primary/30 hover:bg-muted/40 hover:shadow-md",
-                      "focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring"
-                    )}
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="font-medium text-foreground">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/50 hover:bg-transparent">
+                    <TableHead className="font-semibold">Round</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Start time</TableHead>
+                    <TableHead className="font-semibold">End time</TableHead>
+                    <TableHead className="w-12 font-semibold">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rounds.map((round: any) => (
+                    <TableRow key={round._id} className="border-border/50">
+                      <TableCell className="font-medium">
                         {`Round ${round.round_number}`}
-                      </span>
-                      <Badge
-                        variant={
-                          round.is_active
-                            ? "default"
-                            : round.end_time && new Date() > new Date(round.end_time)
-                              ? "secondary" // Passed/Closed
-                              : "outline" // Upcoming/Inactive
-                        }
-                      >
-                         {round.is_active ? "active" : "inactive"}
-                      </Badge>
-                      {round.submission_enabled && (
-                        <Badge variant="secondary">Submissions on</Badge>
-                      )}
-                    </div>
-                    <ChevronRight className="size-5 text-muted-foreground" />
-                  </Link>
-                ))
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={
+                              round.is_active
+                                ? "default"
+                                : round.end_time &&
+                                    new Date() > new Date(round.end_time)
+                                  ? "secondary"
+                                  : "outline"
+                            }
+                          >
+                            {round.is_active ? "active" : "inactive"}
+                          </Badge>
+                          <div className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                            {round.submission_enabled ? (
+                              <CheckCircle2 className="size-4 text-emerald-500" />
+                            ) : (
+                              <XCircle className="size-4 text-muted-foreground" />
+                            )}
+                            {round.submission_enabled
+                              ? "Submissions on"
+                              : "Submissions off"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDateTime(round.start_time)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDateTime(round.end_time)}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <TooltipProvider>
+                          <div className="flex  items-center gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  onClick={() =>
+                                    round.is_active
+                                      ? handleStopRound(round._id)
+                                      : handleStartRound(round._id)
+                                  }
+                                  size="icon"
+                                  className="size-9 rounded-xl"
+                                  variant={
+                                    round.is_active ? "secondary" : "default"
+                                  }
+                                  aria-label={
+                                    round.is_active
+                                      ? "Stop round"
+                                      : "Start round"
+                                  }
+                                >
+                                  {round.is_active ? (
+                                    <StopCircle className="size-4" />
+                                  ) : (
+                                    <PlayCircle className="size-4" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {round.is_active ? "Stop round" : "Start round"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleToggleSubmission(round._id)
+                                  }
+                                  className="size-9 rounded-xl"
+                                  aria-label={
+                                    round.submission_enabled
+                                      ? "Disable submissions"
+                                      : "Enable submissions"
+                                  }
+                                >
+                                  <Upload className="size-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {round.submission_enabled
+                                  ? "Submissions on"
+                                  : "Submissions off"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  asChild
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-9 rounded-xl"
+                                >
+                                  <Link
+                                    href={`/admin/rounds/${round._id}`}
+                                    aria-label="Edit round"
+                                  >
+                                    <Edit className="size-4" />
+                                  </Link>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit round</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => handleDeleteRound(round._id)}
+                                  className="size-9 rounded-xl"
+                                  aria-label="Delete round"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete round</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
         </CardContent>

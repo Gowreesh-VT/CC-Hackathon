@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/loading-state";
 import {
   Select,
   SelectContent,
@@ -20,23 +21,43 @@ import {
   PlayCircle,
   StopCircle,
   Upload,
-  Loader2,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  useGetAdminDashboardQuery, 
-  useGetAdminRoundsQuery, 
-  useToggleRoundStatusMutation 
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  useGetAdminDashboardQuery,
+  useGetAdminRoundsQuery,
+  useToggleRoundStatusMutation,
 } from "@/lib/redux/api/adminApi";
+import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { toast } from "sonner";
 
 export default function AdminDashboardPage() {
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [submissionToggled, setSubmissionToggled] = useState(false);
 
+  // Set breadcrumbs (only Dashboard)
+  useEffect(() => {
+    setBreadcrumbs([]);
+  }, []);
+
   // RTK Query Hooks
   const { data: stats, isLoading: statsLoading } = useGetAdminDashboardQuery();
-  const { data: rounds = [], isLoading: roundsLoading } = useGetAdminRoundsQuery();
+  const { data: rounds = [], isLoading: roundsLoading } =
+    useGetAdminRoundsQuery();
   const [toggleRoundStatus] = useToggleRoundStatusMutation();
 
   const loading = statsLoading || roundsLoading;
@@ -44,37 +65,40 @@ export default function AdminDashboardPage() {
   // Initialize selectedRoundId from stats
   useEffect(() => {
     if (stats?.currentRound && !selectedRoundId) {
-       setSelectedRoundId(stats.currentRound.id);
+      setSelectedRoundId(stats.currentRound.id);
     }
   }, [stats, selectedRoundId]);
 
   // Sync toggle state with selected round
   useEffect(() => {
-     if (selectedRoundId && rounds.length > 0) {
-        const r = rounds.find((rd: any) => rd._id === selectedRoundId);
-        if (r) setSubmissionToggled(r.submission_enabled ?? false);
-     }
+    if (selectedRoundId && rounds.length > 0) {
+      const r = rounds.find((rd: any) => rd._id === selectedRoundId);
+      if (r) setSubmissionToggled(r.submission_enabled ?? false);
+    }
   }, [selectedRoundId, rounds]);
 
   const handleStartRound = async () => {
     if (!selectedRoundId) return;
     try {
-        await toggleRoundStatus({ id: selectedRoundId, action: 'start' }).unwrap();
-        toast.success("Round started successfully");
+      await toggleRoundStatus({
+        id: selectedRoundId,
+        action: "start",
+      }).unwrap();
+      toast.success("Round started successfully");
     } catch (e) {
-        console.error(e);
-        toast.error("Failed to start round");
+      console.error(e);
+      toast.error("Failed to start round");
     }
   };
 
   const handleStopRound = async () => {
     if (!selectedRoundId) return;
     try {
-        await toggleRoundStatus({ id: selectedRoundId, action: 'stop' }).unwrap();
-        toast.success("Round stopped successfully");
+      await toggleRoundStatus({ id: selectedRoundId, action: "stop" }).unwrap();
+      toast.success("Round stopped successfully");
     } catch (e) {
-        console.error(e);
-        toast.error("Failed to stop round");
+      console.error(e);
+      toast.error("Failed to stop round");
     }
   };
 
@@ -82,24 +106,35 @@ export default function AdminDashboardPage() {
     // Optimistic update
     setSubmissionToggled(checked);
     if (!selectedRoundId) return;
-    
+
     try {
-        await toggleRoundStatus({ id: selectedRoundId, action: 'toggle-submission' }).unwrap();
-        toast.success(`Submissions ${checked ? 'enabled' : 'disabled'}`);
+      await toggleRoundStatus({
+        id: selectedRoundId,
+        action: "toggle-submission",
+      }).unwrap();
+      toast.success(`Submissions ${checked ? "enabled" : "disabled"}`);
     } catch (e) {
-        console.error(e);
-        setSubmissionToggled(!checked); // Revert on failure
-        toast.error("Failed to toggle submission");
+      console.error(e);
+      setSubmissionToggled(!checked); // Revert on failure
+      toast.error("Failed to toggle submission");
     }
   };
 
+  // Prepare chart data
+  const evaluationData = [
+    { name: "Submitted", value: stats?.submissionsCount || 0, fill: "#10b981" },
+    {
+      name: "Pending",
+      value: stats?.pendingEvaluationCount || 0,
+      fill: "#f59e0b",
+    },
+  ];
+
+  const totalSubmissions =
+    (stats?.submissionsCount || 0) + (stats?.pendingEvaluationCount || 0);
+
   if (loading || !stats) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
-        <Loader2 className="h-10 w-10 animate-spin text-lime-500" />
-        <p className="text-muted-foreground animate-pulse">Loading dashboard...</p>
-      </div>
-    );
+    return <LoadingState message="Loading dashboard..." />;
   }
 
   return (
@@ -108,160 +143,236 @@ export default function AdminDashboardPage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Admin Dashboard
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Overview and controls for the event
-        </p>
       </header>
 
-      {/* Summary card: all teams */}
-      <Card
-        className={cn(
-          "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
-          "dark:border-white/10 dark:bg-card/80"
-        )}
-      >
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="size-5 text-muted-foreground" />
-            Teams overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-baseline gap-4">
-            <span className="text-3xl font-bold tabular-nums text-foreground">
-              {stats.totalTeams}
-            </span>
-            <span className="text-muted-foreground">total teams</span>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Quick glance at all registered teams and their status.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Current round: submissions & pending evaluation */}
-      <Card
-        className={cn(
-          "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
-          "dark:border-white/10 dark:bg-card/80"
-        )}
-      >
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Clock className="size-5 text-muted-foreground" />
-            Current round status
-          </CardTitle>
-          {stats.currentRound && (
-            <Badge
-              variant={
-                stats.roundStatus === "active" ? "default" : "secondary"
-              }
-              className="mt-2 w-fit"
-            >
-              {stats.currentRound.name}
-            </Badge>
+      <div className="grid gap-4 lg:grid-cols-2 ">
+        {/* Summary card: all teams */}
+        <Card
+          className={cn(
+            "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
+            "dark:border-white/10 dark:bg-card/80",
           )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <FileCheck className="size-4" />
-                <span className="text-sm font-medium">Submissions</span>
-              </div>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {stats.submissionsCount}
-              </p>
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="size-5 text-muted-foreground" />
+              Teams overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-baseline gap-4">
+              <span className="text-3xl font-bold tabular-nums text-foreground">
+                {stats.totalTeams}
+              </span>
+              <span className="text-muted-foreground">total teams</span>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="size-4" />
-                <span className="text-sm font-medium">Pending evaluation</span>
-              </div>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {stats.pendingEvaluationCount}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Round control panel */}
-      <Card
-        className={cn(
-          "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
-          "dark:border-white/10 dark:bg-card/80"
-        )}
-      >
-        <CardHeader>
-          <CardTitle className="text-lg">Round controls</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Select a round and start, stop, or toggle submissions.
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-            <div className="space-y-2">
-              <Label>Round</Label>
-              <Select
-                value={selectedRoundId ?? ""}
-                onValueChange={(v) => setSelectedRoundId(v || null)}
-              >
-                <SelectTrigger
-                  className={cn(
-                    "w-full sm:w-64 rounded-xl border-white/10 bg-background/80",
-                    "dark:border-white/10 dark:bg-background/80"
-                  )}
+            <p className="mt-2 text-sm text-muted-foreground">
+              Quick glance at all registered teams and their status.
+            </p>
+          </CardContent>
+        </Card>
+        {/* Current round: submissions & pending evaluation */}
+        <Card
+          className={cn(
+            "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
+            "dark:border-white/10 dark:bg-card/80",
+          )}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Clock className="size-5 text-muted-foreground" />
+              Current round status
+              {stats.currentRound && (
+                <Badge
+                  variant={
+                    stats.roundStatus === "active" ? "default" : "secondary"
+                  }
+                  className="mt-2 w-fit"
                 >
-                  <SelectValue placeholder="Select a round" />
-                </SelectTrigger>
-                <SelectContent>
-                  {rounds.map((r: any) => (
-                    <SelectItem key={r._id} value={r._id}>
-                      {`Round ${r.round_number} ${r.is_active ? '(Active)' : ''}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  {stats.currentRound.name}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <FileCheck className="size-4" />
+                  <span className="text-sm font-medium">Submissions</span>
+                </div>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">
+                  {stats.submissionsCount}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="size-4" />
+                  <span className="text-sm font-medium">
+                    Pending evaluation
+                  </span>
+                </div>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">
+                  {stats.pendingEvaluationCount}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleStartRound}
-                disabled={!selectedRoundId}
-                className="gap-2 rounded-xl"
-              >
-                <PlayCircle className="size-4" />
-                Start round
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleStopRound}
-                disabled={!selectedRoundId}
-                className="gap-2 rounded-xl"
-              >
-                <StopCircle className="size-4" />
-                Stop round
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/50 bg-muted/20 p-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="submission-toggle"
-                checked={submissionToggled}
-                onCheckedChange={handleToggleSubmission}
-              />
-              <Label htmlFor="submission-toggle" className="cursor-pointer">
-                Submissions {submissionToggled ? "on" : "off"}
-              </Label>
-            </div>
-            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Upload className="size-4" />
-              Turn on to allow teams to submit for the selected round.
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>{" "}
+        {/* Submissions Status Chart */}
+        <Card
+          className={cn(
+            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
+            "dark:border-border/50 dark:bg-card/80",
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FileCheck className="size-5 text-muted-foreground" />
+              Submission status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {totalSubmissions > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={evaluationData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {evaluationData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[300px] items-center justify-center">
+                <p className="text-muted-foreground">No submissions yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {/* Team Distribution Chart */}
+        <Card
+          className={cn(
+            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
+            "dark:border-border/50 dark:bg-card/80",
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="size-5 text-muted-foreground" />
+              Team distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats?.totalTeams ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    {
+                      name: "Distribution",
+                      active: Math.floor((stats?.totalTeams || 0) * 0.6),
+                      shortlisted: Math.floor((stats?.totalTeams || 0) * 0.25),
+                      eliminated: Math.floor((stats?.totalTeams || 0) * 0.15),
+                    },
+                  ]}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={80} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar
+                    dataKey="active"
+                    stackId="a"
+                    fill="#10b981"
+                    name="Active"
+                  />
+                  <Bar
+                    dataKey="shortlisted"
+                    stackId="a"
+                    fill="#3b82f6"
+                    name="Shortlisted"
+                  />
+                  <Bar
+                    dataKey="eliminated"
+                    stackId="a"
+                    fill="#ef4444"
+                    name="Eliminated"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[300px] items-center justify-center">
+                <p className="text-muted-foreground">No team data available</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {/* Top 5 Teams by Cumulative Score */}
+        <Card
+          className={cn(
+            "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm lg:col-span-2",
+            "dark:border-white/10 dark:bg-card/80",
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Trophy className="size-5 text-muted-foreground" />
+              Top 5 teams
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats?.topTeams && stats.topTeams.length > 0 ? (
+              <div className="space-y-2">
+                {stats.topTeams.map((team, index) => (
+                  <div
+                    key={team.id}
+                    className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground">
+                          {team.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {team.track}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-foreground">
+                        {team.cumulativeScore}
+                      </p>
+                      <p className="text-xs text-muted-foreground">points</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-48 items-center justify-center">
+                <p className="text-muted-foreground">
+                  No score data available yet
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

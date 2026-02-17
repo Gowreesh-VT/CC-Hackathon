@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/components/providers";
+import { RoleRedirect } from "@/components/role-redirect";
 import "./globals.css";
+import { Toaster } from "sonner";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
-  title: "CC Hackathon Platform",
+  title: "TetherX Hackathon - CodeChef VITCC",
   description: "Manage judges, teams, and rounds for the CodeChef Hackathon",
+  icons: {
+    icon: "/logo.png ",
+  },
 };
 
 export default function RootLayout({
@@ -15,15 +20,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">
-        <Providers>
-          <TooltipProvider>
-            {children}
-            <Toaster richColors />
-          </TooltipProvider>
-        </Providers>
-      </body>
-    </html>
+    <Suspense fallback={<div>Loading...</div>}>
+      <html lang="en" suppressHydrationWarning>
+        <body className="antialiased">
+          <Providers>
+            <RoleRedirect />
+            <TooltipProvider>
+              {children}
+              <Toaster position="top-right" />
+            </TooltipProvider>
+          </Providers>
+        </body>
+      </html>
+    </Suspense>
   );
 }

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/config/db";
 import Submission from "@/models/Submission";
+import Score from "@/models/Score";
 import User from "@/models/User";
+import Round from "@/models/Round";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
@@ -21,6 +23,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "no team" }, { status: 400 });
 
   try {
+    // Check if round exists
+    const round = await Round.findById(roundId).lean();
+    if (!round) {
+      return NextResponse.json({ error: "round not found" }, { status: 404 });
+    }
+
+    // Check if submission deadline has passed
+    const now = new Date();
+    const endTime = new Date(round.end_time);
+    if (now > endTime) {
+      return NextResponse.json(
+        { error: "submission deadline has passed" },
+        { status: 403 },
+      );
+    }
+
     const doc = await Submission.create({
       team_id: user.team_id,
       round_id: new mongoose.Types.ObjectId(roundId),
@@ -29,6 +47,63 @@ export async function POST(req: Request) {
       overview,
     });
     return NextResponse.json({ ok: true, submission: doc });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email)
+    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+
+  const body = await req.json();
+  const { roundId, fileUrl, githubLink, overview } = body;
+
+  await connectDB();
+  const user = await User.findOne({ email }).lean();
+  if (!user?.team_id)
+    return NextResponse.json({ error: "no team" }, { status: 400 });
+
+  try {
+    // Check if round exists
+    const round = await Round.findById(roundId).lean();
+    if (!round) {
+      return NextResponse.json({ error: "round not found" }, { status: 404 });
+    }
+
+    // Check if submission deadline has passed
+    const now = new Date();
+    const endTime = new Date(round.end_time);
+    if (now > endTime) {
+      return NextResponse.json(
+        { error: "submission deadline has passed" },
+        { status: 403 },
+      );
+    }
+
+    // Find existing submission for this team and round
+    const submission = await Submission.findOne({
+      team_id: user.team_id,
+      round_id: new mongoose.Types.ObjectId(roundId),
+    });
+
+    if (!submission) {
+      return NextResponse.json(
+        { error: "submission not found" },
+        { status: 404 },
+      );
+    }
+
+    // Update only the provided fields
+    if (fileUrl !== undefined) submission.file_url = fileUrl;
+    if (githubLink !== undefined) submission.github_link = githubLink;
+    if (overview !== undefined) submission.overview = overview;
+    // Keep original submitted_at timestamp
+
+    const updatedDoc = await submission.save();
+    return NextResponse.json({ ok: true, submission: updatedDoc });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -51,7 +126,27 @@ export async function GET() {
       .sort({ submitted_at: -1 })
       .lean();
 
-    return NextResponse.json(submissions);
+    // Fetch scores for each submission
+    const submissionsWithScores = await Promise.all(
+      submissions.map(async (submission) => {
+        const score = await Score.findOne({
+          team_id: user.team_id,
+          round_id: submission.round_id._id,
+        }).lean();
+        return {
+          ...submission,
+          score: score
+            ? {
+                score: score.score,
+                status: score.status,
+                remarks: score.remarks,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return NextResponse.json(submissionsWithScores);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

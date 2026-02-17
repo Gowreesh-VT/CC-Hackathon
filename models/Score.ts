@@ -1,4 +1,4 @@
-import mongoose, { Schema, models, model } from "mongoose"
+import mongoose, { Schema, models, model } from "mongoose";
 
 const SchemaObj = new Schema({
   judge_id: { type: Schema.Types.ObjectId, ref: "Judge" },
@@ -6,12 +6,11 @@ const SchemaObj = new Schema({
   round_id: { type: Schema.Types.ObjectId, ref: "Round" },
   score: Number,
   remarks: String,
+  status: { type: String, enum: ["pending", "scored"], default: "pending" },
+  created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
-})
+});
 
-SchemaObj.index(
-  { judge_id: 1, team_id: 1, round_id: 1 },
-  { unique: true }
-)
+SchemaObj.index({ judge_id: 1, team_id: 1, round_id: 1 }, { unique: true });
 
-export default models.Score || model("Score", SchemaObj)
+export default models.Score || model("Score", SchemaObj);
