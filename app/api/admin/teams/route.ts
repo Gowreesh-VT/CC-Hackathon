@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import User from "@/models/User";
 import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import { proxy } from "@/lib/proxy";
 
 export const dynamic = "force-dynamic";
 
 // GET: List all teams with details including scores from all rounds
-export async function GET() {
+async function GETHandler(req: NextRequest) {
   await connectDB();
 
   try {
@@ -155,9 +156,12 @@ export async function GET() {
   }
 }
 
+export const GET = proxy(GETHandler, ["admin"]);
+
 // POST: Add a new team (and create associated user)
-export async function POST(request: Request) {
+async function POSTHandler(request: NextRequest) {
   await connectDB();
+
   try {
     const body = await request.json();
 
@@ -221,3 +225,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = proxy(POSTHandler, ["admin"]);

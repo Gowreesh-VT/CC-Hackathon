@@ -1,17 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import Round from "@/models/Round";
 import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import { proxy } from "@/lib/proxy";
 
-export async function GET(
-    request: Request,
-    { params }: { params: Promise<{ teamId: string }> }
+async function GETHandler(
+    request: NextRequest,
+    context: { params: Promise<{ teamId: string }> }
 ) {
     await connectDB();
-    const { teamId } = await params;
+    const { teamId } = await context.params;
 
     try {
         const team = await Team.findById(teamId).lean();
@@ -73,3 +74,5 @@ export async function GET(
         return NextResponse.json({ error: "Failed to fetch details" }, { status: 500 });
     }
 }
+
+export const GET = proxy(GETHandler, ["admin"]);

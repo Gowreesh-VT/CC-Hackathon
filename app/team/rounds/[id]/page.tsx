@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, AlertCircle, Timer } from "lucide-react";
 import { ensureAbsoluteUrl } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
@@ -268,10 +269,23 @@ export default function Page() {
                 {task.description}
               </p>
               <Button
-                className="mt-4 w-full"
-                variant={
-                  selectedSubtaskId === task._id ? "default" : "outline"
-                }
+                size="lg"
+                onClick={async () => {
+                  try {
+                    await selectSubtask({
+                      roundId: id,
+                      subtaskId: selectedSubtaskId,
+                    }).unwrap();
+                    toast.success("Subtask selected successfully!");
+                  } catch (error: any) {
+                    console.error("Failed to select subtask:", error);
+                    toast.error(
+                      "Failed to select subtask: " +
+                        (error?.data?.error || "Unknown error"),
+                    );
+                  }
+                }}
+                disabled={isSelecting}
               >
                 {selectedSubtaskId === task._id ? "Selected" : "Select"}
               </Button>

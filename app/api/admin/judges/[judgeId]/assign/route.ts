@@ -1,20 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import JudgeAssignment from "@/models/JudgeAssignment";
-import Judge from "@/models/Judge";
-import Round from "@/models/Round";
+import { proxy } from "@/lib/proxy";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ judgeId: string }> },
+async function POSTHandler(
+  request: NextRequest,
+  context: { params: Promise<{ judgeId: string }> },
 ) {
   await connectDB();
-  const { judgeId } = await params;
+  const { judgeId } = await context.params;
 
   try {
     const body = await request.json();
     const { teamIds, roundId } = body;
-    // expecting { teamIds: string[], roundId?: string }
 
     if (!Array.isArray(teamIds)) {
       return NextResponse.json(
@@ -23,9 +21,6 @@ export async function POST(
       );
     }
 
-    // Determine roundId if not provided. logic: use active round
-    // Determine roundId if not provided. logic: use active round
-    // Determine roundId if not provided. logic: use active round
     let rId = roundId;
     if (!rId) {
       const Round = (await import("@/models/Round")).default;
@@ -39,36 +34,16 @@ export async function POST(
       return NextResponse.json({ error: "Round ID is required or no active round found" }, { status: 400 });
     }
 
-    // 1. Remove existing assignments for this judge (and round if applicable)
-    // Or just overwrite? The UI seems to toggle assignment status.
-    // simpler to delete all for this judge and re-create for the checked ones.
-    // BUT wait, what if we only want to update? 
-    // The UI sends "teamIds". It implies "these are THE teams assigned".
-    // So distinct replacement is safer.
-
-    // However, if we want to support round-based assignment, we should delete only for that round?
-    // The current UI seems to be global assignment or undefined round.
-    // Let's assume global for now or just wipe previous assignments.
-
     // 1. Remove existing assignments for this judge AND this round
-    // This preserves assignments for other rounds (e.g., Round 1 history)
     if (rId) {
       await JudgeAssignment.deleteMany({ judge_id: judgeId, round_id: rId });
     } else {
-      // Fallback behavior: if no round specified, maybe clear all? 
-      // Or better safe than sorry: require round ID.
-      // But for backward compat with whatever frontend sends, if rId is null, we might be in trouble.
-      // Assuming rId is always resolved above.
-
-      // If rId is null, it means we couldn't find an active round or provided one.
-      // We should probably error out or default to clearing "global" assignments if that concept exists.
-      // Current logic allows rId to be null.
       await JudgeAssignment.deleteMany({ judge_id: judgeId, round_id: null });
     }
 
     // 2. Create new assignments
     if (teamIds.length > 0) {
-      const assignments = teamIds.map(teamId => ({
+      const assignments = teamIds.map((teamId: string) => ({
         judge_id: judgeId,
         team_id: teamId,
         round_id: rId,
@@ -92,3 +67,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = proxy(POSTHandler, ["admin"]);

@@ -69,7 +69,7 @@ export function AppSidebar() {
         <Button
           variant="outline"
           className="w-full justify-start gap-2"
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: "/login?action=logout" })}
         >
           <LogOut className="h-4 w-4" />
           Logout

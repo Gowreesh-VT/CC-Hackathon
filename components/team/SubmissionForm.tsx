@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { SubtaskSummary } from "./SubtaskCard";
+import { toast } from "sonner";
 import {
   useSubmitProjectMutation,
   useUpdateSubmissionMutation,
@@ -73,8 +74,10 @@ export default function SubmissionForm({
 
       if (isEditing) {
         await updateSubmission(payload).unwrap();
+        toast.success("Submission updated successfully!");
       } else {
         await submitProject(payload).unwrap();
+        toast.success("Project submitted successfully!");
       }
 
       setFinal(true);
@@ -91,7 +94,7 @@ export default function SubmissionForm({
       }
     } catch (e: any) {
       console.error(e);
-      alert("Submission failed: " + (e?.data?.error || "Unknown error"));
+      toast.error("Submission failed: " + (e?.data?.error || "Unknown error"));
     }
   }
 

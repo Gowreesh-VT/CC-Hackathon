@@ -511,48 +511,48 @@ export default function AdminJudgesPage() {
                           No teams available for this round
                         </p>
                       ) : (
-                        teams.map((team) => {
-                          const isAssigned = tempAssignedTeams.includes(
-                            team.id,
-                          );
-                          const isDisabled = disabledTeamIds.includes(team.id);
+                        teams
+                          .filter((team) => !disabledTeamIds.includes(team.id))
+                          .map((team) => {
+                            const isAssigned = tempAssignedTeams.includes(
+                              team.id,
+                            );
 
-                          return (
-                            <button
-                              key={team.id}
-                              onClick={() => handleToggleTeamSelection(team.id)}
-                              disabled={isAssigningTeams || isDisabled}
-                              className={cn(
-                                "w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
-                                isAssigned
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border/50 bg-muted/50 hover:border-border hover:bg-muted",
-                                isDisabled && "opacity-60 cursor-not-allowed",
-                                "disabled:opacity-50 disabled:cursor-not-allowed",
-                              )}
-                            >
-                              <span className="font-medium text-foreground">
-                                {team.name}
-                              </span>
+                            return (
+                              <button
+                                key={team.id}
+                                onClick={() => handleToggleTeamSelection(team.id)}
+                                disabled={isAssigningTeams}
+                                className={cn(
+                                  "w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
+                                  isAssigned
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border/50 bg-muted/50 hover:border-border hover:bg-muted",
+                                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                                )}
+                              >
+                                <span className="font-medium text-foreground">
+                                  {team.name}
+                                </span>
 
-                              {isAssigned && (
-                                <svg
-                                  className="size-5 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          );
-                        })
+                                {isAssigned && (
+                                  <svg
+                                    className="size-5 text-primary"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })
                       )}
                     </div>
                   </div>

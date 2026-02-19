@@ -49,6 +49,20 @@ export default function LoginPage() {
     toastShownRef.current = true;
   }, [errorMessage, status]);
 
+  // Show logout success toast
+  useEffect(() => {
+    if (searchParams.get("action") === "logout" && !toastShownRef.current) {
+      // Use a small timeout to ensure UI is ready
+      const timeoutId = window.setTimeout(() => {
+        toast.success("Successfully logged out");
+        toastShownRef.current = true;
+        // Optional: Remove the query param to prevent toast on refresh (requires router.replace)
+        router.replace("/login"); 
+      }, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [searchParams, router]);
+
   return (
     <main
       className="relative min-h-screen bg-cover bg-center"

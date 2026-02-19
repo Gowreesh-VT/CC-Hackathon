@@ -8,21 +8,18 @@ import JudgeAssignment from "@/models/JudgeAssignment";
 import Score from "@/models/Score";
 import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
 import Submission from "@/models/Submission";
+import { proxy } from "@/lib/proxy";
 
-export async function GET(req: NextRequest) {
+async function GETHandler(req: NextRequest) {
   await connectDB();
 
   const url = new URL(req.url);
   const roundId = url.searchParams.get("round_id");
 
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return new Response(JSON.stringify({ error: "Unauthenticated" }), {
-      status: 401,
-    });
-  }
 
-  const user = await User.findOne({ email: session.user.email });
+  // User verified by withRole, but need details
+  const user = await User.findOne({ email: session?.user?.email });
   if (!user) {
     return new Response(JSON.stringify({ error: "User not found" }), {
       status: 404,
@@ -87,11 +84,11 @@ export async function GET(req: NextRequest) {
         selected_subtask: selection?.subtask_id ?? null,
         submission: submission
           ? {
-              file_url: submission.file_url,
-              github_link: submission.github_link,
-              submission_text: submission.submission_text,
-              submitted_at: submission.submitted_at,
-            }
+            file_url: submission.file_url,
+            github_link: submission.github_link,
+            submission_text: submission.submission_text,
+            submitted_at: submission.submitted_at,
+          }
           : null,
       };
     }),
@@ -102,3 +99,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(filteredResults);
 }
+
+export const GET = proxy(GETHandler, ["judge", "admin"]);

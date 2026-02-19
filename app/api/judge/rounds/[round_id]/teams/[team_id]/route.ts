@@ -1,5 +1,5 @@
 import { connectDB } from "@/config/db";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
@@ -9,6 +9,8 @@ import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import JudgeAssignment from "@/models/JudgeAssignment";
+import { scoreSchema } from "@/lib/validations";
+import { proxy } from "@/lib/proxy";
 
 async function getJudgeFromSession() {
   const session = await getServerSession(authOptions);
@@ -27,7 +29,7 @@ async function getJudgeFromSession() {
    GET TEAM DETAILS
 ========================= */
 
-export async function GET(
+async function GETHandler(
   _req: NextRequest,
   context: { params: Promise<{ round_id: string; team_id: string }> },
 ) {
@@ -55,6 +57,27 @@ export async function GET(
     });
   }
 
+  // IDOR CHECK: Ensure the judge is assigned to this team for this round
+  const judgeSession = await getJudgeFromSession();
+  if (judgeSession?.judge) {
+    const assignment = await JudgeAssignment.findOne({
+      judge_id: judgeSession.judge._id,
+      team_id,
+      round_id,
+    });
+
+    if (!assignment) {
+      return new Response(JSON.stringify({ error: "Forbidden: You are not assigned to this team." }), {
+        status: 403,
+      });
+    }
+  } else {
+    // If not a judge (and not caught by earlier check?), what then?
+    // withRole ensures we are at least logged in as judge or admin.
+    // However, getJudgeFromSession might return null if DB is inconsistent.
+    return new Response(JSON.stringify({ error: "Unauthenticated" }), { status: 401 });
+  }
+
   const selection = await TeamSubtaskSelection.findOne({
     team_id,
     round_id,
@@ -66,14 +89,13 @@ export async function GET(
   }).sort({ submitted_at: -1 });
 
   // Get the score and remarks for this team if available
-  const ids = await getJudgeFromSession();
   let score = null;
   let remarks = "";
   let status = "pending";
 
-  if (ids?.judge) {
+  if (judgeSession?.judge) {
     const scoreDoc = await Score.findOne({
-      judge_id: ids.judge._id,
+      judge_id: judgeSession.judge._id,
       team_id,
       round_id,
     });
@@ -94,10 +116,10 @@ export async function GET(
     selected_subtask: selection ? selection.subtask_id : null,
     submission: submission
       ? {
-          file_url: submission.file_url,
-          github_link: submission.github_link,
-          submitted_at: submission.submitted_at,
-        }
+        file_url: submission.file_url,
+        github_link: submission.github_link,
+        submitted_at: submission.submitted_at,
+      }
       : null,
     score,
     remarks,
@@ -105,11 +127,13 @@ export async function GET(
   });
 }
 
+export const GET = proxy(GETHandler, ["judge", "admin"]);
+
 /* =========================
    POST SCORE
 ========================= */
 
-export async function POST(
+async function POSTHandler(
   req: NextRequest,
   context: { params: Promise<{ round_id: string; team_id: string }> },
 ) {
@@ -138,13 +162,16 @@ export async function POST(
   }
 
   const body = await req.json().catch(() => ({}));
-  const { score: scoreValue, remarks } = body;
 
-  if (typeof scoreValue !== "number") {
-    return new Response(JSON.stringify({ error: "Invalid score" }), {
+  // Zod Validation
+  const validation = scoreSchema.safeParse(body);
+  if (!validation.success) {
+    return new Response(JSON.stringify({ error: validation.error.flatten().fieldErrors }), {
       status: 400,
     });
   }
+
+  const { score: scoreValue, remarks } = validation.data;
 
   const assignment = await JudgeAssignment.findOne({
     judge_id: ids.judge._id,
@@ -180,11 +207,13 @@ export async function POST(
   return Response.json({ data: doc });
 }
 
+export const POST = proxy(POSTHandler, ["judge", "admin"]);
+
 /* =========================
    UPDATE SCORE
 ========================= */
 
-export async function PUT(
+async function PUTHandler(
   req: NextRequest,
   context: { params: Promise<{ round_id: string; team_id: string }> },
 ) {
@@ -213,13 +242,16 @@ export async function PUT(
   }
 
   const body = await req.json().catch(() => ({}));
-  const { score: scoreValue, remarks } = body;
 
-  if (typeof scoreValue !== "number") {
-    return new Response(JSON.stringify({ error: "Invalid score" }), {
+  // Zod Validation
+  const validation = scoreSchema.safeParse(body);
+  if (!validation.success) {
+    return new Response(JSON.stringify({ error: validation.error.flatten().fieldErrors }), {
       status: 400,
     });
   }
+
+  const { score: scoreValue, remarks } = validation.data;
 
   const assignment = await JudgeAssignment.findOne({
     judge_id: ids.judge._id,
@@ -258,3 +290,5 @@ export async function PUT(
 
   return Response.json({ data: updated });
 }
+
+export const PUT = proxy(PUTHandler, ["judge", "admin"]);

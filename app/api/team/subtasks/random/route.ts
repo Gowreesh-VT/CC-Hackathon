@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Subtask from "@/models/Subtask";
+import { proxy } from "@/lib/proxy";
 
-export async function GET(req: Request) {
+async function GETHandler(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const roundId = searchParams.get("roundId");
 
@@ -24,3 +25,5 @@ export async function GET(req: Request) {
 
   return NextResponse.json(payload);
 }
+
+export const GET = proxy(GETHandler, ["team"]);

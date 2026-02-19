@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Round from "@/models/Round";
+import { roundSchema } from "@/lib/validations";
+import { proxy } from "@/lib/proxy";
 
 // GET: Fetch all rounds
-export async function GET() {
+async function GETHandler(req: NextRequest) {
   await connectDB();
+
   try {
     const rounds = await Round.find({}).sort({ round_number: 1 });
     return NextResponse.json(rounds);
@@ -17,12 +20,21 @@ export async function GET() {
   }
 }
 
+export const GET = proxy(GETHandler, ["admin"]);
+
 // POST: Create a new round
-export async function POST(request: Request) {
+async function POSTHandler(request: NextRequest) {
   await connectDB();
+
   try {
     const body = await request.json();
-    const { round_number, start_time, end_time, instructions } = body;
+
+    const validation = roundSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { round_number, start_time, end_time, instructions } = validation.data;
 
     // specific validation can go here
     if (!round_number) {
@@ -50,3 +62,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = proxy(POSTHandler, ["admin"]);

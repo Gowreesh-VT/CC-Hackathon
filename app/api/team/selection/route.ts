@@ -1,17 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
 import User from "@/models/User";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
+import { proxy } from "@/lib/proxy";
 
-export async function GET(req: Request) {
+async function GETHandler(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const roundId = searchParams.get("roundId");
 
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
+  // Validated by withRole, but needed for user lookup
   if (!email) return NextResponse.json({ selection: null });
 
   await connectDB();
@@ -25,14 +27,14 @@ export async function GET(req: Request) {
   return NextResponse.json({ selection: sel });
 }
 
-export async function POST(req: Request) {
+export const GET = proxy(GETHandler, ["team"]);
+
+async function POSTHandler(req: NextRequest) {
   const body = await req.json();
   const { roundId, subtaskId } = body;
 
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
-  if (!email)
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -57,3 +59,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export const POST = proxy(POSTHandler, ["team"]);

@@ -99,12 +99,31 @@ export default function JudgeRoundDetailsPage() {
     }
   }, [selectedTeamId, evaluations]);
 
-  const handleSave = async () => {
+  const handleOpenDialog = (teamId: string) => {
+    setSelectedTeamId(teamId);
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedTeamId(null);
+    setDialogScore("");
+    setDialogRemarks("");
+  };
+
+  const handleScoreChange = (value: string) => {
+    // Allow only 0-20 range
+    if (
+      value === "" ||
+      (/^\d+$/.test(value) && parseInt(value) >= 0 && parseInt(value) <= 20)
+    ) {
+      setDialogScore(value);
+    }
+  };
+
+  const handleSaveEvaluation = async () => {
     if (!selectedTeamId) return;
     const score = dialogScore === "" ? 0 : parseInt(dialogScore);
-
-    if (score < 0 || score > 10) {
-      toast.error("Score must be between 0 and 10");
+    if (score < 0 || score > 20) {
+      toast.error("Please enter a valid score (0-20)");
       return;
     }
 
@@ -289,20 +308,39 @@ export default function JudgeRoundDetailsPage() {
           )}
 
           <div className="space-y-4">
-            <Input
-              type="number"
-              min={0}
-              max={10}
-              value={dialogScore}
-              onChange={(e) => setDialogScore(e.target.value)}
-              placeholder="Score (0–10)"
-            />
-            <Textarea
-              value={dialogRemarks}
-              onChange={(e) => setDialogRemarks(e.target.value)}
-              placeholder="Remarks (optional)"
-              rows={5}
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Score <span className="text-red-500">*</span>
+                <span className="text-xs text-muted-foreground ml-2">
+                  (0-20)
+                </span>
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="20"
+                value={dialogScore}
+                onChange={(e) => handleScoreChange(e.target.value)}
+                placeholder="Enter score"
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Remarks{" "}
+                <span className="text-xs text-muted-foreground ml-2">
+                  (optional)
+                </span>
+              </label>
+              <Textarea
+                value={dialogRemarks}
+                onChange={(e) => setDialogRemarks(e.target.value)}
+                placeholder="Add feedback for the team..."
+                rows={6}
+                className="resize-none"
+              />
+            </div>
           </div>
 
           <DialogFooter>

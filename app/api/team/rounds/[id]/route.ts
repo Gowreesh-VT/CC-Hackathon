@@ -8,13 +8,14 @@ import Subtask from "@/models/Subtask";
 import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import { proxy } from "@/lib/proxy";
 
-export async function GET(
+async function GETHandler(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
     const { teamId } = await getTeamSession();
 
     await connectDB();
@@ -84,37 +85,38 @@ export async function GET(
       },
       selection: selection
         ? {
-            _id: selection._id,
-            subtask_id: selection.subtask_id,
-            team_id: selection.team_id,
-            round_id: selection.round_id,
-          }
+          _id: selection._id,
+          subtask_id: selection.subtask_id,
+          team_id: selection.team_id,
+          round_id: selection.round_id,
+        }
         : null,
       subtask: subtask
         ? {
-            _id: subtask._id,
-            title: subtask.title,
-            description: subtask.description,
-            track: subtask.track,
-            statement: subtask.statement,
-          }
+          _id: subtask._id,
+          title: subtask.title,
+          description: subtask.description,
+          track: subtask.track,
+          statement: subtask.statement,
+        }
         : null,
       submission: submission
         ? {
-            _id: submission._id,
-            submitted_at: submission.submitted_at,
-            github_link: submission.github_link,
-            file_url: submission.file_url,
-            overview: submission.overview,
-            submission_text: submission.submission_text,
-          }
+          _id: submission._id,
+          submitted_at: submission.submitted_at,
+          github_link: submission.github_link,
+          file_url: submission.file_url,
+          overview: submission.overview,
+          submission_text: submission.submission_text,
+          submitted_by_team_id: submission.team_id,
+        }
         : null,
       score: score
         ? {
-            score: score.score,
-            remarks: score.remarks,
-            status: score.status,
-          }
+          score: score.score,
+          remarks: score.remarks,
+          status: score.status,
+        }
         : null,
       initialSubtasks,
     };
@@ -127,3 +129,5 @@ export async function GET(
     return NextResponse.json({ error: message }, { status });
   }
 }
+
+export const GET = proxy(GETHandler, ["team"]);

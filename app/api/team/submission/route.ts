@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
@@ -7,15 +7,24 @@ import Round from "@/models/Round";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
+import { submissionSchema } from "@/lib/validations";
+import { proxy } from "@/lib/proxy";
 
-export async function POST(req: Request) {
+async function POSTHandler(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
+  // email checks are technically redundant with withRole but good for type safety/finding user
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const body = await req.json();
-  const { roundId, fileUrl, githubLink, overview } = body;
+
+  const validation = submissionSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+  }
+
+  const { roundId, fileUrl, githubLink, overview } = validation.data;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -52,14 +61,22 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export const POST = proxy(POSTHandler, ["team"]);
+
+async function PATCHHandler(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const body = await req.json();
-  const { roundId, fileUrl, githubLink, overview } = body;
+
+  const validation = submissionSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+  }
+
+  const { roundId, fileUrl, githubLink, overview } = validation.data;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -109,7 +126,9 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function GET() {
+export const PATCH = proxy(PATCHHandler, ["team"]);
+
+async function GETHandler(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email)
@@ -137,10 +156,10 @@ export async function GET() {
           ...submission,
           score: score
             ? {
-                score: score.score,
-                status: score.status,
-                remarks: score.remarks,
-              }
+              score: score.score,
+              status: score.status,
+              remarks: score.remarks,
+            }
             : null,
         };
       }),
@@ -151,3 +170,5 @@ export async function GET() {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export const GET = proxy(GETHandler, ["team"]);

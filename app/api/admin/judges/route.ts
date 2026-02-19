@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Judge from "@/models/Judge";
 import JudgeAssignment from "@/models/JudgeAssignment";
 import User from "@/models/User";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; // Assuming authOptions is exported from here
+import { judgeSchema } from "@/lib/validations";
+import { proxy } from "@/lib/proxy";
 
 // GET: List all judges with their assigned teams
-export async function GET() {
+async function GETHandler(req: NextRequest) {
   await connectDB();
 
   try {
@@ -43,21 +43,21 @@ export async function GET() {
   }
 }
 
+export const GET = proxy(GETHandler, ["admin"]);
+
 // POST: Add a new judge
-export async function POST(request: Request) {
+async function POSTHandler(request: NextRequest) {
   await connectDB();
 
   try {
     const body = await request.json();
-    const { name, email, password } = body;
 
-    // Create a User for the judge first (if they need login)
-    // For now, assuming we just create a Judge record linked to a User
-    // If we only have name/email in the UI, we might need to create a dummy user or handle it differently.
+    const validation = judgeSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+    }
 
-    // For the hackathon context, usually we just create a Judge entry
-    // But the Judge model has `user_id` required and ref to `User`.
-    // So we MUST create a User first or find one.
+    const { name, email, password } = validation.data;
 
     // Simplify: Create a User with role 'judge'
     const existingUser = await User.findOne({ email });
@@ -111,3 +111,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = proxy(POSTHandler, ["admin"]);
