@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Image from "next/image";
 
 type Role = "team" | "judge" | "admin";
 
@@ -57,26 +58,29 @@ export default function LoginPage() {
         toast.success("Successfully logged out");
         toastShownRef.current = true;
         // Optional: Remove the query param to prevent toast on refresh (requires router.replace)
-        router.replace("/login"); 
+        router.replace("/login");
       }, 0);
       return () => window.clearTimeout(timeoutId);
     }
   }, [searchParams, router]);
 
   return (
-    <main
-      className="relative min-h-screen bg-cover bg-center"
-      style={{
-        backgroundImage:
-          "url('/login.jpg')",
-      }}
-    >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/40" />
+    <main className="flex min-h-screen flex-col lg:flex-row-reverse">
+      {/* Image section - 2/3 width on lg+ screens, smaller on mobile */}
+      <div className="relative h-48 lg:h-auto lg:w-2/3">
+        <Image
+          src="/login.jpg"
+          alt="Login background"
+          fill
+          className="object-cover"
+        />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-      <div className="relative z-10 flex min-h-screen items-center px-6">
-        {/* LEFT aligned login card */}
-        <Card className="w-full max-w-md border-border bg-card/95 backdrop-blur-md shadow-xl">
+      {/* Sign-in section - 1/3 width on lg+ screens, centered on mobile */}
+      <div className="flex flex-1 items-center justify-center px-6 py-12 lg:w-1/3 bg-background">
+        <Card className="w-full max-w-md border-border bg-card shadow-xl">
           <CardHeader className="space-y-3">
             <CardTitle className="text-3xl font-extrabold tracking-tight">
               Sign in
