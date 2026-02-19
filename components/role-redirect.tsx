@@ -51,6 +51,7 @@ export function RoleRedirect() {
       return;
     }
 
+    console.log(target.path);
     router.replace(target.path);
   }, [pathname, router, searchParams, session, status]);
 

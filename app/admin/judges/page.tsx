@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/loading-state";
@@ -245,10 +246,6 @@ export default function AdminJudgesPage() {
     return teamIds.map((id) => teams.find((t) => t.id === id)?.name || id);
   };
 
-  if (isLoadingJudges || isLoadingTeams) {
-    return <LoadingState message="Loading judges..." fullScreen={true} />;
-  }
-
   return (
     <div className="space-y-8">
       <header>
@@ -338,7 +335,27 @@ export default function AdminJudgesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {judges.length === 0 ? (
+                {isLoadingJudges || isLoadingTeams ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i} className="border-border/50">
+                      <TableCell>
+                        <Skeleton className="h-4 w-40 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <Skeleton className="h-4 w-24 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : judges.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={3}
@@ -356,9 +373,11 @@ export default function AdminJudgesPage() {
                       <TableCell className="font-medium">
                         {judge.name}
                       </TableCell>
+
                       <TableCell className="text-muted-foreground">
                         {judge.assignedTeamsCount || 0} teams
                       </TableCell>
+
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <TooltipProvider>
                           <div className="flex items-center gap-2">
@@ -375,22 +394,21 @@ export default function AdminJudgesPage() {
                               </TooltipTrigger>
                               <TooltipContent>Edit judge</TooltipContent>
                             </Tooltip>
+
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="size-8 rounded-lg"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openAssignmentModal(judge);
-                                  }}
+                                  onClick={() => openAssignmentModal(judge)}
                                 >
                                   <Users className="size-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Assign teams</TooltipContent>
                             </Tooltip>
+
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
