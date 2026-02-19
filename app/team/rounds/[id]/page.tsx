@@ -274,7 +274,7 @@ export default function Page() {
                   try {
                     await selectSubtask({
                       roundId: id,
-                      subtaskId: selectedSubtaskId,
+                      subtaskId: task._id,
                     }).unwrap();
                     toast.success("Subtask selected successfully!");
                   } catch (error: any) {
@@ -298,7 +298,7 @@ export default function Page() {
         <Button
           size="lg"
           onClick={() =>
-            selectSubtask({ roundId: id, subtaskId: selectedSubtaskId })
+            selectSubtask({ roundId: id, subtaskId: selectedSubtaskId! })
           }
           disabled={isSelecting}
         >
