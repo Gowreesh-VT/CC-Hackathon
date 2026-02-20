@@ -1,46 +1,95 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ExternalLink } from "lucide-react";
 import { useGetTeamSubmissionsQuery } from "@/lib/redux/api/teamApi";
-import { LoadingState } from "@/components/loading-state";
 import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function TeamSubmissionsPage() {
-  const { data: submissions = [], isLoading: loading } =
+  const { data: submissions = [], isLoading } =
     useGetTeamSubmissionsQuery();
 
-  // Set breadcrumbs for team submissions
   useEffect(() => {
     setBreadcrumbs([{ label: "Submissions", href: "/team/submissions" }]);
   }, []);
 
-  if (loading) {
-    return <LoadingState message="Loading submissions..." fullScreen={true} />;
-  }
-
   return (
-    <div className="flex flex-col gap-6 min-h-screen">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight text-white">
-          Submissions
-        </h1>
-        <p className="text-gray-400">View your submission history.</p>
+    <div className="flex min-h-screen flex-col gap-6">
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight">Submissions</h1>
+        <p className="text-muted-foreground">
+          View your submission history.
+        </p>
       </div>
 
-      <Card className="bg-neutral-900 border-neutral-800 text-white">
+      <Card>
         <CardHeader>
           <CardTitle>Submission History</CardTitle>
         </CardHeader>
+
         <CardContent>
-          {submissions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="rounded-full bg-neutral-800 p-3 mb-4">
+          {isLoading ? (
+            /* Skeleton Table */
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50">
+                  <tr>
+                    {[
+                      "Round",
+                      "Submitted At",
+                      "Links",
+                      "Overview",
+                      "Score",
+                      "Status",
+                      "Remarks",
+                    ].map((h) => (
+                      <th key={h} className="px-6 py-3 text-left">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border">
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-24" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-32" />
+                      </td>
+                      <td className="px-6 py-4 space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-24" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-40" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-12" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-32" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : submissions.length === 0 ? (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-4 rounded-full border border-border bg-muted p-3">
                 <svg
-                  className="h-6 w-6 text-gray-400"
+                  className="h-6 w-6 text-muted-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -49,54 +98,65 @@ export default function TeamSubmissionsPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-white">
+
+              <h3 className="text-lg font-semibold">
                 No submissions yet
               </h3>
-              <p className="text-sm text-gray-400 mt-1 max-w-sm">
-                You haven't made any submissions yet. Once you submit a project
-                for a round, it will appear here.
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Once you submit a project for a round, it will appear here.
               </p>
             </div>
           ) : (
+            /* Actual Data */
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs uppercase bg-neutral-800 text-gray-400">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50 text-muted-foreground">
                   <tr>
-                    <th className="px-6 py-3">Round</th>
-                    <th className="px-6 py-3">Submitted At</th>
-                    <th className="px-6 py-3">Links</th>
-                    <th className="px-6 py-3">Overview</th>
-                    <th className="px-6 py-3">Score</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Remarks</th>
+                    <th className="px-6 py-3 text-left">Round</th>
+                    <th className="px-6 py-3 text-left">
+                      Submitted At
+                    </th>
+                    <th className="px-6 py-3 text-left">Links</th>
+                    <th className="px-6 py-3 text-left">
+                      Overview
+                    </th>
+                    <th className="px-6 py-3 text-left">Score</th>
+                    <th className="px-6 py-3 text-left">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left">
+                      Remarks
+                    </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {submissions.map((sub) => (
                     <tr
                       key={sub._id}
-                      className="border-b border-neutral-800 hover:bg-neutral-800/50"
+                      className="border-b border-border transition hover:bg-muted/50"
                     >
                       <td className="px-6 py-4 font-medium">
                         {sub.round_id?.round_number
                           ? `Round ${sub.round_id.round_number}`
                           : "Unknown Round"}
                       </td>
-                      <td className="px-6 py-4">
+
+                      <td className="px-6 py-4 text-muted-foreground">
                         {new Date(sub.submitted_at).toLocaleString()}
                       </td>
+
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           {sub.github_link && (
                             <a
                               href={ensureAbsoluteUrl(sub.github_link)}
                               target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-lime-400 hover:underline"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
                             >
                               GitHub <ExternalLink className="h-3 w-3" />
                             </a>
@@ -105,52 +165,42 @@ export default function TeamSubmissionsPage() {
                             <a
                               href={ensureAbsoluteUrl(sub.file_url)}
                               target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-blue-400 hover:underline"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
                             >
-                              Document <ExternalLink className="h-3 w-3" />
+                              Document{" "}
+                              <ExternalLink className="h-3 w-3" />
                             </a>
                           )}
                         </div>
                       </td>
+
                       <td
-                        className="px-6 py-4 max-w-xs truncate"
+                        className="px-6 py-4 max-w-xs truncate text-muted-foreground"
                         title={sub.overview}
                       >
                         {sub.overview || "-"}
                       </td>
+
                       <td className="px-6 py-4">
                         {sub.score ? (
-                          <span className="font-semibold text-green-400">
+                          <span className="font-semibold text-primary">
                             {sub.score.score}/10
                           </span>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-muted-foreground">
+                            -
+                          </span>
                         )}
                       </td>
+
                       <td className="px-6 py-4">
-                        {sub.score ? (
-                          <Badge
-                            variant="outline"
-                            className={
-                              sub.score.status === "scored"
-                                ? "bg-green-500/10 text-green-500 border-green-500/20"
-                                : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                            }
-                          >
-                            {sub.score.status}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="bg-gray-500/10 text-gray-500 border-gray-500/20"
-                          >
-                            Pending
-                          </Badge>
-                        )}
+                        <Badge variant="outline">
+                          {sub.score?.status || "Pending"}
+                        </Badge>
                       </td>
+
                       <td
-                        className="px-6 py-4 max-w-xs truncate"
+                        className="px-6 py-4 max-w-xs truncate text-muted-foreground"
                         title={sub.score?.remarks}
                       >
                         {sub.score?.remarks || "-"}

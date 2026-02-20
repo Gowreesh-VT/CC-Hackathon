@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -203,14 +204,37 @@ export default function AdminTeamsPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5 + allRounds.length + 3}
-                      className="text-center py-4"
-                    >
-                      Loading teams...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i} className="border-border/50">
+                      <TableCell>
+                        <Skeleton className="h-4 w-32 rounded-md" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20 rounded-md" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24 rounded-md" />
+                      </TableCell>
+
+                      {allRounds.map((round: any) => (
+                        <TableCell key={round.roundId} className="text-center">
+                          <Skeleton className="mx-auto h-4 w-10 rounded-md" />
+                        </TableCell>
+                      ))}
+
+                      <TableCell className="text-center">
+                        <Skeleton className="mx-auto h-4 w-12 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                      </TableCell>
+
+                      <TableCell>
+                        <Skeleton className="h-8 w-20 rounded-lg" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : (
                   teams.map((team: any) => (
                     <TableRow
@@ -224,59 +248,35 @@ export default function AdminTeamsPage() {
                       <TableCell className="text-muted-foreground">
                         {team.currentRoundName ?? "—"}
                       </TableCell>
+
                       {allRounds.map((round: any) => {
                         const roundScore = team.roundScores?.find(
-                          (rs: any) => rs.roundId === round.roundId,
+                          (rs: any) => rs.roundId === round.roundId
                         );
                         return (
                           <TableCell
                             key={round.roundId}
                             className="text-center font-medium"
                           >
-                            {roundScore?.score !== null &&
-                            roundScore?.score !== undefined
-                              ? roundScore.score
-                              : "—"}
+                            {roundScore?.score ?? "—"}
                           </TableCell>
                         );
                       })}
+
                       <TableCell className="text-center font-semibold">
-                        {team.roundScores && team.roundScores.length > 0
-                          ? team.roundScores.reduce(
-                              (sum: number, rs: any) => sum + (rs.score || 0),
-                              0,
-                            )
-                          : "—"}
+                        {team.roundScores?.reduce(
+                          (sum: number, rs: any) => sum + (rs.score || 0),
+                          0
+                        ) ?? "—"}
                       </TableCell>
+
                       <TableCell>
-                        <Badge
-                          variant={(() => {
-                            switch (team.submissionStatus) {
-                              case "eliminated":
-                                return "destructive";
-                              case "shortlisted":
-                                return "default";
-                              case "submitted":
-                                return "default";
-                              case "pending":
-                                return "secondary";
-                              case "locked":
-                                return "outline";
-                              default:
-                                return "secondary";
-                            }
-                          })()}
-                        >
-                          {team.submissionStatus}
-                        </Badge>
+                        <Badge>{team.submissionStatus}</Badge>
                       </TableCell>
+
                       <TableCell>
                         <Link href={`/admin/teams/${team.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-2 rounded-lg"
-                          >
+                          <Button variant="ghost" size="sm" className="gap-2 rounded-lg">
                             <Eye className="size-4" /> View
                           </Button>
                         </Link>

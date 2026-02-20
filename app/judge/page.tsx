@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, Clock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetJudgeAssignedTeamsQuery } from "@/lib/redux/api/judgeApi";
@@ -24,38 +24,35 @@ export default function JudgeHomePage() {
   const {
     data: assignedTeams = [],
     isLoading,
-    error,
     isError,
+    error,
   } = useGetJudgeAssignedTeamsQuery();
 
-  const pendingCount = assignedTeams.filter(
-    (t: any) => t.status === "pending",
-  ).length;
-  const scoredCount = assignedTeams.filter(
-    (t: any) => t.status === "scored",
-  ).length;
-
-  // Set breadcrumbs for judge dashboard
   useEffect(() => {
     setBreadcrumbs([]);
   }, []);
 
-  const handleTeamClick = (teamId: string) => {
+  const pendingCount = assignedTeams.filter(
+    (t: any) => t.status === "pending",
+  ).length;
+
+  const scoredCount = assignedTeams.filter(
+    (t: any) => t.status === "scored",
+  ).length;
+
+  const handleTeamClick = () => {
     router.push(`/judge/rounds`);
   };
 
-  if (isLoading) {
-    return <LoadingState message="Loading assigned teams..." />;
-  }
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Judge Dashboard
+        </h1>
+      </header>
 
-  if (isError) {
-    return (
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Judge Dashboard
-          </h1>
-        </header>
+      {isError && (
         <Card>
           <CardContent className="pt-6">
             <p className="text-destructive font-semibold">
@@ -66,86 +63,65 @@ export default function JudgeHomePage() {
             </p>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Judge Dashboard
-        </h1>
-      </header>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Total Assigned Teams */}
-        <Card
-          className={cn(
-            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
-          )}
-        >
-          <CardHeader className="pb-2">
+        {/* Teams Assigned */}
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="size-5 text-muted-foreground" />
               Teams assigned
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap items-baseline gap-4">
-              <span className="text-3xl font-bold tabular-nums text-foreground">
-                {assignedTeams.length}
-              </span>
-              <span className="text-muted-foreground">teams to evaluate</span>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              You have {pendingCount} teams pending evaluation.
-            </p>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="mt-2 h-4 w-48" />
+              </>
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{assignedTeams.length}</p>
+                <p className="text-sm text-muted-foreground">
+                  You have {pendingCount} teams pending evaluation.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Evaluation Progress */}
-        <Card
-          className={cn(
-            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm",
-          )}
-        >
-          <CardHeader className="pb-2">
+        {/* Progress */}
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <CheckCircle className="size-5 text-muted-foreground" />
               Progress
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="size-4" />
-                  <span className="text-sm font-medium">Pending</span>
-                </div>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">
-                  {pendingCount}
-                </p>
+          <CardContent>
+            {isLoading ? (
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
               </div>
-              <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <CheckCircle className="size-4" />
-                  <span className="text-sm font-medium">Scored</span>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-semibold">{pendingCount}</p>
                 </div>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">
-                  {scoredCount}
-                </p>
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Scored</p>
+                  <p className="text-2xl font-semibold">{scoredCount}</p>
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Teams List */}
-        <Card
-          className={cn(
-            "overflow-hidden border-border/50 bg-card/80 shadow-lg backdrop-blur-sm lg:col-span-2",
-          )}
-        >
+        <Card className="lg:col-span-2 border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="size-5 text-muted-foreground" />
@@ -153,31 +129,37 @@ export default function JudgeHomePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {assignedTeams.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : assignedTeams.length === 0 ? (
               <div className="flex h-48 items-center justify-center">
-                <p className="text-muted-foreground">No teams assigned yet.</p>
+                <p className="text-muted-foreground">
+                  No teams assigned yet.
+                </p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                 {assignedTeams.map((team: TeamAssignment) => (
                   <div
                     key={team.team_id}
-                    className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-4 hover:bg-muted/40 transition-colors cursor-pointer"
-                    onClick={() => handleTeamClick(team.team_id)}
+                    onClick={handleTeamClick}
+                    className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-muted/40 transition"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
-                        <span className="text-sm font-semibold text-primary">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 border">
+                        <span className="font-semibold text-primary">
                           {team.team_name.charAt(0)}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">
-                          {team.team_name}
-                        </p>
+                        <p className="font-medium">{team.team_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {team.status === "scored"
-                            ? `Scored: ${team.score || "—"}`
+                            ? `Scored: ${team.score ?? "—"}`
                             : "Awaiting evaluation"}
                         </p>
                       </div>

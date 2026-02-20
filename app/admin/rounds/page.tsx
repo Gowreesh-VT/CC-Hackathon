@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -52,7 +53,6 @@ import {
 import { toast } from "sonner";
 
 export default function AdminRoundsPage() {
-  // Set breadcrumbs
   useEffect(() => {
     setBreadcrumbs([{ label: "Rounds", href: "/admin/rounds" }]);
   }, []);
@@ -70,7 +70,6 @@ export default function AdminRoundsPage() {
 
   const handleCreateRound = async () => {
     if (!roundNumber) return;
-
     try {
       await createRound({
         round_number: parseInt(roundNumber),
@@ -78,7 +77,6 @@ export default function AdminRoundsPage() {
         start_time: startTime ? new Date(startTime).toISOString() : null,
         end_time: endTime ? new Date(endTime).toISOString() : null,
       }).unwrap();
-
       toast.success("Round created successfully");
       setCreateOpen(false);
       setRoundNumber("");
@@ -86,99 +84,83 @@ export default function AdminRoundsPage() {
       setStartTime("");
       setEndTime("");
     } catch (e: any) {
-      console.error(e);
-      toast.error(
-        `Failed to create round: ${e?.data?.error || "Unknown error"}`,
-      );
+      toast.error(e?.data?.error || "Failed to create round");
     }
   };
 
-  const handleStartRound = async (roundId: string) => {
+  const handleStartRound = async (id: string) => {
     try {
-      await toggleRoundStatus({
-        id: roundId,
-        action: "start",
-      }).unwrap();
-      toast.success("Round started successfully");
-    } catch (e) {
-      console.error(e);
+      await toggleRoundStatus({ id, action: "start" }).unwrap();
+      toast.success("Round started");
+    } catch {
       toast.error("Failed to start round");
     }
   };
 
-  const handleStopRound = async (roundId: string) => {
+  const handleStopRound = async (id: string) => {
     try {
-      await toggleRoundStatus({ id: roundId, action: "stop" }).unwrap();
-      toast.success("Round stopped successfully");
-    } catch (e) {
-      console.error(e);
+      await toggleRoundStatus({ id, action: "stop" }).unwrap();
+      toast.success("Round stopped");
+    } catch {
       toast.error("Failed to stop round");
     }
   };
 
-  const handleToggleSubmission = async (roundId: string) => {
+  const handleToggleSubmission = async (id: string) => {
     try {
-      await toggleRoundStatus({
-        id: roundId,
-        action: "toggle-submission",
-      }).unwrap();
+      await toggleRoundStatus({ id, action: "toggle-submission" }).unwrap();
       toast.success("Submission status updated");
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("Failed to toggle submission");
     }
   };
 
-  const handleDeleteRound = async (roundId: string) => {
-    const confirmed = confirm(
-      "Delete this round? This will also delete related subtasks, submissions, and assignments.",
-    );
-    if (!confirmed) return;
+  const handleDeleteRound = async (id: string) => {
+    if (!confirm("Delete this round and all related data?")) return;
     try {
-      await deleteRound(roundId).unwrap();
-      toast.success("Round deleted successfully");
-    } catch (e) {
-      console.error(e);
+      await deleteRound(id).unwrap();
+      toast.success("Round deleted");
+    } catch {
       toast.error("Failed to delete round");
     }
   };
 
-  const formatDateTime = (value?: string | null) => {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleString();
+  const formatDateTime = (v?: string | null) => {
+    if (!v) return "—";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
   };
 
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Rounds
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage all rounds and open round details to edit subtasks and teams.
+          Manage all rounds and open details to edit subtasks and teams.
         </p>
       </header>
 
       <Card
         className={cn(
-          "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
-          "dark:border-white/10 dark:bg-card/80",
+          "overflow-hidden border-border bg-card/80 backdrop-blur-sm",
         )}
       >
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ListOrdered className="size-5 text-muted-foreground" />
+            <ListOrdered className="h-5 w-5 text-muted-foreground" />
             All rounds
           </CardTitle>
+
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 rounded-xl">
-                <Plus className="size-4" />
+                <Plus className="h-4 w-4" />
                 Create round
               </Button>
             </DialogTrigger>
+
             <DialogContent className="rounded-2xl sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create new round</DialogTitle>
@@ -186,28 +168,27 @@ export default function AdminRoundsPage() {
                   Enter the round number and optional instructions.
                 </DialogDescription>
               </DialogHeader>
+
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="round-number">Round Number</Label>
                   <Input
                     id="round-number"
                     type="number"
-                    placeholder="e.g. 2"
                     value={roundNumber}
                     onChange={(e) => setRoundNumber(e.target.value)}
-                    className="rounded-lg"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="instructions">Instructions (Optional)</Label>
+                  <Label htmlFor="instructions">Instructions</Label>
                   <Input
                     id="instructions"
-                    placeholder="Brief instructions..."
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
-                    className="rounded-lg"
                   />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start-time">Start Time</Label>
@@ -216,7 +197,6 @@ export default function AdminRoundsPage() {
                       type="datetime-local"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="rounded-lg block"
                     />
                   </div>
                   <div className="space-y-2">
@@ -226,57 +206,94 @@ export default function AdminRoundsPage() {
                       type="datetime-local"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
-                      className="rounded-lg block"
                     />
                   </div>
                 </div>
               </div>
+
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setCreateOpen(false)}
-                  className="rounded-xl"
-                >
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleCreateRound}
-                  disabled={!roundNumber}
-                  className="rounded-xl"
-                >
+                <Button onClick={handleCreateRound} disabled={!roundNumber}>
                   Create
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </CardHeader>
+
         <CardContent>
-          <div className="h-150 overflow-auto rounded-xl border border-border/50">
+          <div className="max-h-[36rem] overflow-auto rounded-xl border border-border/50">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading rounds...</p>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/50">
+                    <TableHead>Round</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Start time</TableHead>
+                    <TableHead>End time</TableHead>
+                    <TableHead className="w-12">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i} className="border-border/50">
+                      <TableCell>
+                        <Skeleton className="h-4 w-24 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="space-y-2">
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                          <Skeleton className="h-4 w-32 rounded-md" />
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Skeleton className="h-4 w-32 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <Skeleton className="h-4 w-32 rounded-md" />
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : rounds.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground p-4">
                 No rounds found. Create one to get started.
               </p>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="font-semibold">Round</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Start time</TableHead>
-                    <TableHead className="font-semibold">End time</TableHead>
-                    <TableHead className="w-12 font-semibold">
-                      Actions
-                    </TableHead>
+                  <TableRow className="border-border/50">
+                    <TableHead>Round</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Start time</TableHead>
+                    <TableHead>End time</TableHead>
+                    <TableHead className="w-12">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {rounds.map((round: any) => (
                     <TableRow key={round._id} className="border-border/50">
                       <TableCell className="font-medium">
-                        {`Round ${round.round_number}`}
+                        Round {round.round_number}
                       </TableCell>
+
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge
@@ -291,50 +308,47 @@ export default function AdminRoundsPage() {
                           >
                             {round.is_active ? "active" : "inactive"}
                           </Badge>
-                          <div className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+
+                          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
                             {round.submission_enabled ? (
-                              <CheckCircle2 className="size-4 text-emerald-500" />
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
                             ) : (
-                              <XCircle className="size-4 text-muted-foreground" />
+                              <XCircle className="h-4 w-4 text-muted-foreground" />
                             )}
                             {round.submission_enabled
                               ? "Submissions on"
                               : "Submissions off"}
-                          </div>
+                          </span>
                         </div>
                       </TableCell>
+
                       <TableCell className="text-muted-foreground">
                         {formatDateTime(round.start_time)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatDateTime(round.end_time)}
                       </TableCell>
+
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <TooltipProvider>
-                          <div className="flex  items-center gap-2">
+                          <div className="flex items-center gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
+                                  size="icon"
+                                  variant={
+                                    round.is_active ? "secondary" : "default"
+                                  }
                                   onClick={() =>
                                     round.is_active
                                       ? handleStopRound(round._id)
                                       : handleStartRound(round._id)
                                   }
-                                  size="icon"
-                                  className="size-9 rounded-xl"
-                                  variant={
-                                    round.is_active ? "secondary" : "default"
-                                  }
-                                  aria-label={
-                                    round.is_active
-                                      ? "Stop round"
-                                      : "Start round"
-                                  }
                                 >
                                   {round.is_active ? (
-                                    <StopCircle className="size-4" />
+                                    <StopCircle className="h-4 w-4" />
                                   ) : (
-                                    <PlayCircle className="size-4" />
+                                    <PlayCircle className="h-4 w-4" />
                                   )}
                                 </Button>
                               </TooltipTrigger>
@@ -342,58 +356,43 @@ export default function AdminRoundsPage() {
                                 {round.is_active ? "Stop round" : "Start round"}
                               </TooltipContent>
                             </Tooltip>
+
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
-                                  variant="outline"
                                   size="icon"
+                                  variant="outline"
                                   onClick={() =>
                                     handleToggleSubmission(round._id)
                                   }
-                                  className="size-9 rounded-xl"
-                                  aria-label={
-                                    round.submission_enabled
-                                      ? "Disable submissions"
-                                      : "Enable submissions"
-                                  }
                                 >
-                                  <Upload className="size-4" />
+                                  <Upload className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {round.submission_enabled
-                                  ? "Submissions on"
-                                  : "Submissions off"}
+                                Toggle submissions
                               </TooltipContent>
                             </Tooltip>
+
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
-                                  asChild
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-9 rounded-xl"
-                                >
-                                  <Link
-                                    href={`/admin/rounds/${round._id}`}
-                                    aria-label="Edit round"
-                                  >
-                                    <Edit className="size-4" />
+                                <Button asChild size="icon" variant="ghost">
+                                  <Link href={`/admin/rounds/${round._id}`}>
+                                    <Edit className="h-4 w-4" />
                                   </Link>
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Edit round</TooltipContent>
                             </Tooltip>
+
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
-                                  variant="destructive"
                                   size="icon"
+                                  variant="destructive"
                                   onClick={() => handleDeleteRound(round._id)}
-                                  className="size-9 rounded-xl"
-                                  aria-label="Delete round"
                                 >
-                                  <Trash2 className="size-4" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Delete round</TooltipContent>

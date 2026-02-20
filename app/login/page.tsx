@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Image from "next/image";
 
 type Role = "team" | "judge" | "admin";
 
@@ -29,7 +30,6 @@ export default function LoginPage() {
     return null;
   }, [searchParams]);
 
-  // Redirect authenticated users based on role
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role) {
       const role = session.user.role as Role;
@@ -42,17 +42,12 @@ export default function LoginPage() {
     }
   }, [status, session, router]);
 
-  // Show error toast only if not authenticated and there's an error
   useEffect(() => {
     if (!errorMessage || toastShownRef.current || status === "authenticated") {
       return;
     }
-    const timeoutId = window.setTimeout(() => {
-      toast.error(errorMessage);
-      toastShownRef.current = true;
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
+    toast.error(errorMessage);
+    toastShownRef.current = true;
   }, [errorMessage, status]);
 
   // Show logout success toast
@@ -63,47 +58,71 @@ export default function LoginPage() {
         toast.success("Successfully logged out");
         toastShownRef.current = true;
         // Optional: Remove the query param to prevent toast on refresh (requires router.replace)
-        router.replace("/login"); 
+        router.replace("/login");
       }, 0);
       return () => window.clearTimeout(timeoutId);
     }
   }, [searchParams, router]);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-6 py-16">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-center text-3xl font-bold">
-            Sign in
-          </CardTitle>
+    <main className="flex min-h-screen flex-col lg:flex-row-reverse">
+      {/* Image section - 2/3 width on lg+ screens, smaller on mobile */}
+      <div className="relative h-48 lg:h-auto lg:w-2/3">
+        <Image
+          src="/login.jpg"
+          alt="Login background"
+          fill
+          className="object-cover"
+        />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-          <CardDescription className="text-center">
-            Use your Google account to access the hackathon platform.
-          </CardDescription>
-        </CardHeader>
+      {/* Sign-in section - 1/3 width on lg+ screens, centered on mobile */}
+      <div className="flex flex-1 items-center justify-center px-6 py-12 lg:w-1/3 bg-background">
+        <Card className="w-full max-w-md border-border bg-card shadow-xl">
+          <CardHeader className="space-y-3">
+            <CardTitle className="text-3xl font-extrabold tracking-tight">
+              Sign in
+            </CardTitle>
 
-        <CardContent>
-          <div className="rounded-xl border p-6 space-y-3">
-            <p className="text-base font-semibold">Continue with Google</p>
-            <p className="text-sm text-muted-foreground">
-              Your role is detected automatically after authentication.
-            </p>
-            {errorMessage ? (
-              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {errorMessage}
+            <CardDescription className="text-muted-foreground">
+              Access the hackathon platform using your Google account.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-6 rounded-2xl border border-border bg-background p-6">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold tracking-wide">
+                  Continue with Google
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Your role is automatically detected after authentication.
+                </p>
+              </div>
+
+              {errorMessage && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                  {errorMessage}
+                </div>
+              )}
+
+              <Button
+                size="lg"
+                className="w-full rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 active:scale-[0.98]"
+                onClick={() => signIn("google")}
+              >
+                Sign in with Google
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Only authorized emails can access the platform
               </p>
-            ) : null}
-
-            <Button
-              size="lg"
-              className="mt-2 w-full transition-colors duration-200 hover:bg-blue-600 hover:text-white"
-              onClick={() => signIn("google")}
-            >
-              Sign in with Google
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }
