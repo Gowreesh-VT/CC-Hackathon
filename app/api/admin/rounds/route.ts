@@ -15,7 +15,7 @@ async function GETHandler(req: NextRequest) {
     console.error("Error fetching rounds:", error);
     return NextResponse.json(
       { error: "Failed to fetch rounds" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -31,14 +31,20 @@ async function POSTHandler(request: NextRequest) {
 
     const validation = roundSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+      return NextResponse.json(
+        { error: validation.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
 
-    const { round_number, start_time, end_time, instructions } = validation.data;
+    const { round_number, start_time, end_time, instructions } =
+      validation.data;
 
-    // specific validation can go here
     if (!round_number) {
-      return NextResponse.json({ error: "Round number is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Round number is required" },
+        { status: 400 },
+      );
     }
 
     const newRound = await Round.create({
@@ -47,7 +53,6 @@ async function POSTHandler(request: NextRequest) {
       end_time: end_time ? new Date(end_time) : null,
       instructions: instructions || "",
       is_active: false,
-      submission_enabled: false
     });
 
     return NextResponse.json(

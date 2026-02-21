@@ -5,7 +5,7 @@ import { getTeamSession } from "@/lib/getTeamSession";
 import Team from "@/models/Team";
 import Round from "@/models/Round";
 import Subtask from "@/models/Subtask";
-import TeamSubtaskSelection from "@/models/TeamSubtaskSelection";
+import RoundOptions from "@/models/RoundOptions";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import { proxy } from "@/lib/proxy";
@@ -25,49 +25,80 @@ async function GETHandler(
       return NextResponse.json({ error: "Round not found" }, { status: 404 });
     }
 
-    const selection = await TeamSubtaskSelection.findOne({
+    // Get team with track info
+    const team = await Team.findById(teamId).populate(
+      "track_id",
+      "name description",
+    );
+    if (!team) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    }
+
+    const selection = await RoundOptions.findOne({
       team_id: teamId,
       round_id: id,
-    }).lean();
+    })
+      .populate("selected", "title description")
+      .populate("options", "title description")
+      .lean();
 
     let subtask = null;
     let submission = null;
-    let initialSubtasks: any[] = [];
+    let availableOptions: any[] = [];
     let score = null;
 
     if (selection) {
-      if (selection.subtask_id) {
-        subtask = await Subtask.findById(selection.subtask_id).lean();
+      // If selection exists, check if they have selected a subtask
+      if (selection.selected) {
+        subtask = selection.selected;
       }
+
+      // Get available options from the options field
+      if (selection.options && Array.isArray(selection.options)) {
+        availableOptions = (selection.options as any[]).map((opt) => ({
+          _id: opt._id,
+          title: opt.title,
+          description: opt.description,
+        }));
+      }
+
       submission = await Submission.findOne({
         team_id: teamId,
         round_id: id,
       }).lean();
     } else {
-      // If no selection, get 2 random subtasks
-      const subs = await Subtask.aggregate([
-        {
-          $match: {
-            round_id: new mongoose.Types.ObjectId(round._id as string),
-          },
-        },
-        { $sample: { size: 2 } },
-      ]);
-      initialSubtasks = subs.map((s: any) => ({
-        _id: s._id,
-        title: s.title,
-        description: s.description,
-        track: s.track,
-        statement: s.statement,
-      }));
+      // If no selection yet, get subtasks for the team's track
+      const trackId = (team.track_id as any)?._id;
+      if (trackId) {
+        const subs = await Subtask.find({
+          track_id: new mongoose.Types.ObjectId(trackId.toString()),
+          is_active: true,
+        })
+          .select("_id title description")
+          .lean();
+
+        availableOptions = subs.map((s: any) => ({
+          _id: s._id,
+          title: s.title,
+          description: s.description,
+        }));
+      }
     }
 
     // Get score if submission exists
     if (submission) {
-      score = await Score.findOne({
-        team_id: teamId,
-        round_id: id,
+      const scores = await Score.find({
+        submission_id: submission._id,
+        status: "scored",
       }).lean();
+      if (scores.length > 0) {
+        const totalScore = scores.reduce((sum, s) => sum + (s.score || 0), 0);
+        score = {
+          score: totalScore,
+          remarks: scores[0]?.remarks || "",
+          status: "scored",
+        };
+      }
     }
 
     // Serialize data
@@ -76,49 +107,57 @@ async function GETHandler(
         _id: round._id,
         round_number: round.round_number,
         is_active: round.is_active,
-        submission_enabled: round.submission_enabled,
         instructions: round.instructions,
         start_time: round.start_time,
         end_time: round.end_time,
         created_at: round.created_at,
         updated_at: round.updated_at,
       },
+      team: {
+        _id: team._id,
+        team_name: team.team_name,
+        track: (team.track_id as any)?.name || "N/A",
+        track_id: (team.track_id as any)?._id?.toString() || null,
+        track_description: (team.track_id as any)?.description || null,
+      },
       selection: selection
         ? {
-          _id: selection._id,
-          subtask_id: selection.subtask_id,
-          team_id: selection.team_id,
-          round_id: selection.round_id,
-        }
+            _id: selection._id,
+            selected: selection.selected,
+            team_id: selection.team_id,
+            round_id: selection.round_id,
+            selected_at: selection.selected_at,
+          }
         : null,
       subtask: subtask
         ? {
-          _id: subtask._id,
-          title: subtask.title,
-          description: subtask.description,
-          track: subtask.track,
-          statement: subtask.statement,
-        }
+            _id: (subtask as any)._id,
+            title: (subtask as any).title,
+            description: (subtask as any).description,
+          }
         : null,
+      availableOptions: availableOptions,
+      hasOptions: selection
+        ? selection.options && selection.options.length > 0
+        : false,
       submission: submission
         ? {
-          _id: submission._id,
-          submitted_at: submission.submitted_at,
-          github_link: submission.github_link,
-          file_url: submission.file_url,
-          overview: submission.overview,
-          submission_text: submission.submission_text,
-          submitted_by_team_id: submission.team_id,
-        }
+            _id: submission._id,
+            submitted_at: submission.submitted_at,
+            github_link: submission.github_link,
+            file_url: submission.file_url,
+            overview: submission.overview,
+            submission_text: submission.submission_text,
+            submitted_by_team_id: submission.team_id,
+          }
         : null,
       score: score
         ? {
-          score: score.score,
-          remarks: score.remarks,
-          status: score.status,
-        }
+            score: score.score,
+            remarks: score.remarks,
+            status: score.status,
+          }
         : null,
-      initialSubtasks,
     };
 
     return NextResponse.json(responseData);

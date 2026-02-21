@@ -1,9 +1,18 @@
-import mongoose, { Schema, models, model } from "mongoose";
+import mongoose, { Schema, Document, models, model } from "mongoose";
 
-const SchemaObj = new Schema({
+export interface IScore extends Document {
+  judge_id: mongoose.Types.ObjectId;
+  submission_id: mongoose.Types.ObjectId;
+  score: number;
+  remarks: string;
+  status: "pending" | "scored";
+  created_at: Date;
+  updated_at: Date;
+}
+
+const ScoreSchema = new Schema<IScore>({
   judge_id: { type: Schema.Types.ObjectId, ref: "Judge" },
-  team_id: { type: Schema.Types.ObjectId, ref: "Team" },
-  round_id: { type: Schema.Types.ObjectId, ref: "Round" },
+  submission_id: { type: Schema.Types.ObjectId, ref: "Submission" },
   score: Number,
   remarks: String,
   status: { type: String, enum: ["pending", "scored"], default: "pending" },
@@ -11,6 +20,6 @@ const SchemaObj = new Schema({
   updated_at: { type: Date, default: Date.now },
 });
 
-SchemaObj.index({ judge_id: 1, team_id: 1, round_id: 1 }, { unique: true });
+ScoreSchema.index({ judge_id: 1, submission_id: 1 }, { unique: true });
 
-export default models.Score || model("Score", SchemaObj);
+export default models.Score || model<IScore>("Score", ScoreSchema);

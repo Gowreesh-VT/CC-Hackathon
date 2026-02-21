@@ -3,8 +3,7 @@ import mongoose, { Schema, Document, models, model } from "mongoose";
 export interface ISubtask extends Document {
   title: string;
   description: string;
-  track: string;
-  round_id: mongoose.Types.ObjectId;
+  track_id: mongoose.Types.ObjectId;
   is_active: boolean;
   created_at: Date;
 }
@@ -12,10 +11,10 @@ export interface ISubtask extends Document {
 const SubtaskSchema = new Schema<ISubtask>({
   title: String,
   description: String,
-  track: String,
-  round_id: {
+  track_id: {
     type: Schema.Types.ObjectId,
-    ref: "Round",
+    ref: "Track",
+    required: true,
   },
   is_active: { type: Boolean, default: true },
   created_at: { type: Date, default: Date.now },

@@ -1,51 +1,44 @@
 import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Judge from "@/models/Judge";
-import JudgeAssignment from "@/models/JudgeAssignment";
 import User from "@/models/User";
+import Track from "@/models/Track";
 import { judgeSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
 
-// GET: List all judges with their assigned teams
+// GET: List all judges with their track information
 async function GETHandler(req: NextRequest) {
   await connectDB();
 
   try {
-    // Populate user info (email)
-    const judges = await Judge.find({}).populate("user_id", "email").lean();
+    const judges = await Judge.find({})
+      .populate("user_id", "email")
+      .populate("track_id", "name")
+      .lean();
 
-    const judgesWithAssignments = await Promise.all(
-      judges.map(async (judge: any) => {
-        const assignments = await JudgeAssignment.find({
-          judge_id: judge._id,
-        }).lean();
+    const judgesData = judges.map((judge: any) => ({
+      id: judge._id.toString(),
+      judge_name: judge.judge_name,
+      email: judge.user_id?.email || "N/A",
+      track: judge.track_id?.name || "N/A",
+      track_id: judge.track_id?._id?.toString() || null,
+      teams_assigned: judge.teams_assigned || [],
+      created_at: judge.created_at,
+    }));
 
-        // aggregate team IDs matching the judge
-        const assignedTeamIds = assignments.map((a) => a.team_id.toString());
-
-        return {
-          id: judge._id.toString(),
-          name: judge.name,
-          email: judge.user_id?.email || "N/A",
-          assignedTeams: assignedTeamIds,
-          assignedTeamsCount: assignedTeamIds.length,
-        };
-      })
-    );
-
-    return NextResponse.json(judgesWithAssignments);
+    return NextResponse.json(judgesData);
   } catch (error) {
     console.error("Error fetching judges:", error);
     return NextResponse.json(
       { error: "Failed to fetch judges" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export const GET = proxy(GETHandler, ["admin"]);
 
-// POST: Add a new judge
+// POST: Create a new judge
 async function POSTHandler(request: NextRequest) {
   await connectDB();
 
@@ -54,52 +47,71 @@ async function POSTHandler(request: NextRequest) {
 
     const validation = judgeSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+      return NextResponse.json(
+        { error: validation.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
 
-    const { name, email, password } = validation.data;
+    const { judge_name, email, track_id } = validation.data;
 
-    // Simplify: Create a User with role 'judge'
-    const existingUser = await User.findOne({ email });
-    let userId;
+    // Verify track exists
+    const track = await Track.findById(track_id);
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
 
-    if (existingUser) {
-      if (existingUser.role !== "judge" && existingUser.role !== "admin") {
-        return NextResponse.json({ error: "Email is already registered as a Team or other role." }, { status: 400 });
-      }
+    // Check if user exists
+    let user = await User.findOne({ email });
 
-      // Check if judge profile already exists for this user
-      const existingJudge = await Judge.findOne({ user_id: existingUser._id });
+    if (user) {
+      // If user exists, check if they're already a judge
+      const existingJudge = await Judge.findOne({ user_id: user._id });
       if (existingJudge) {
-        return NextResponse.json({ error: "Judge profile already exists for this email." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Judge profile already exists for this email" },
+          { status: 400 },
+        );
       }
 
-      userId = existingUser._id;
+      // If user has a different role, return error
+      if (user.role !== "judge") {
+        return NextResponse.json(
+          { error: `Email is already registered as ${user.role}` },
+          { status: 400 },
+        );
+      }
     } else {
-      const newUser = await User.create({
-        name,
+      // Create new user with judge role
+      user = await User.create({
         email,
-        password_hash: "password123", // Default password or generated (TODO: Email this)
-        role: "judge"
+        role: "judge",
       });
-      userId = newUser._id;
     }
 
+    // Create judge profile
     const newJudge = await Judge.create({
-      user_id: userId,
-      name: name,
+      user_id: user._id,
+      judge_name,
+      track_id,
     });
+
+    // Populate the response
+    const populatedJudge = await Judge.findById(newJudge._id)
+      .populate("user_id", "email")
+      .populate("track_id", "name")
+      .lean();
 
     return NextResponse.json(
       {
-        message: "Judge added successfully",
+        message: "Judge created successfully",
         judge: {
-          id: newJudge._id.toString(),
-          name: newJudge.name,
-          email: email,
-          assignedTeams: [],
-          assignedTeamsCount: 0
-        }
+          id: populatedJudge._id.toString(),
+          judge_name: populatedJudge.judge_name,
+          email: (populatedJudge.user_id as any)?.email,
+          track: (populatedJudge.track_id as any)?.name,
+          track_id: (populatedJudge.track_id as any)?._id?.toString(),
+        },
       },
       { status: 201 },
     );
@@ -107,7 +119,7 @@ async function POSTHandler(request: NextRequest) {
     console.error("Error creating judge:", error);
     return NextResponse.json(
       { error: "Failed to create judge" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,13 +1,12 @@
-import mongoose, { Schema, Document, models, model } from "mongoose"
+import mongoose, { Schema, Document, models, model } from "mongoose";
 
 export interface IRound extends Document {
-  round_number: number
-  start_time: Date
-  end_time: Date
-  is_active: boolean
-  submission_enabled: boolean
-  instructions: string
-  created_at: Date
+  round_number: number;
+  start_time: Date;
+  end_time: Date;
+  is_active: boolean;
+  instructions: string;
+  created_at: Date;
 }
 
 const RoundSchema = new Schema<IRound>({
@@ -15,9 +14,8 @@ const RoundSchema = new Schema<IRound>({
   start_time: Date,
   end_time: Date,
   is_active: { type: Boolean, default: false },
-  submission_enabled: { type: Boolean, default: false },
   instructions: { type: String, default: "" }, // Instructions for the round
   created_at: { type: Date, default: Date.now },
-})
+});
 
-export default models.Round || model<IRound>("Round", RoundSchema)
+export default models.Round || model<IRound>("Round", RoundSchema);

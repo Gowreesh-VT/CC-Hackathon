@@ -1,12 +1,58 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Judge from "@/models/Judge";
 import User from "@/models/User";
-import JudgeAssignment from "@/models/JudgeAssignment";
+import Track from "@/models/Track";
+import { proxy } from "@/lib/proxy";
+import { z } from "zod";
 
-// PATCH: Update judge details (name and/or email)
-export async function PATCH(
-  request: Request,
+const updateJudgeSchema = z.object({
+  judge_name: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  track_id: z.string().min(1).optional(),
+});
+
+// GET: Get single judge details
+async function GETHandler(
+  request: NextRequest,
+  { params }: { params: Promise<{ judgeId: string }> },
+) {
+  await connectDB();
+  const { judgeId } = await params;
+
+  try {
+    const judge = await Judge.findById(judgeId)
+      .populate("user_id", "email")
+      .populate("track_id", "name")
+      .lean();
+
+    if (!judge) {
+      return NextResponse.json({ error: "Judge not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      id: judge._id.toString(),
+      judge_name: judge.judge_name,
+      email: (judge.user_id as any)?.email || "N/A",
+      track: (judge.track_id as any)?.name || "N/A",
+      track_id: (judge.track_id as any)?._id?.toString() || null,
+      teams_assigned: judge.teams_assigned || [],
+      created_at: judge.created_at,
+    });
+  } catch (error) {
+    console.error("Error fetching judge:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch judge" },
+      { status: 500 },
+    );
+  }
+}
+
+export const GET = proxy(GETHandler, ["admin"]);
+
+// PATCH: Update judge details
+async function PATCHHandler(
+  request: NextRequest,
   { params }: { params: Promise<{ judgeId: string }> },
 ) {
   await connectDB();
@@ -14,25 +60,41 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { name, email } = body;
+    const validation = updateJudgeSchema.safeParse(body);
 
-    // Find the judge
-    const judge = await Judge.findById(judgeId).populate("user_id");
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const { judge_name, email, track_id } = validation.data;
+
+    const judge = await Judge.findById(judgeId);
     if (!judge) {
       return NextResponse.json({ error: "Judge not found" }, { status: 404 });
     }
 
-    // Update judge name if provided
-    if (name) {
-      judge.name = name;
+    // Update judge_name if provided
+    if (judge_name) {
+      judge.judge_name = judge_name;
+    }
+
+    // Update track_id if provided
+    if (track_id) {
+      const track = await Track.findById(track_id);
+      if (!track) {
+        return NextResponse.json({ error: "Track not found" }, { status: 404 });
+      }
+      judge.track_id = track_id as any;
     }
 
     // Update user email if provided
     if (email && judge.user_id) {
-      // Check if email is already used by another user
       const existingUser = await User.findOne({
         email,
-        _id: { $ne: judge.user_id._id },
+        _id: { $ne: judge.user_id },
       });
 
       if (existingUser) {
@@ -42,16 +104,15 @@ export async function PATCH(
         );
       }
 
-      // Update the user email
-      await User.findByIdAndUpdate(judge.user_id._id, { email });
+      await User.findByIdAndUpdate(judge.user_id, { email });
     }
 
-    // Save judge updates
     await judge.save();
 
     // Return updated judge
     const updatedJudge = await Judge.findById(judgeId)
       .populate("user_id", "email")
+      .populate("track_id", "name")
       .lean();
 
     return NextResponse.json(
@@ -59,8 +120,10 @@ export async function PATCH(
         message: "Judge updated successfully",
         judge: {
           id: updatedJudge?._id.toString(),
-          name: updatedJudge?.name,
-          email: updatedJudge?.user_id?.email || "N/A",
+          judge_name: updatedJudge?.judge_name,
+          email: (updatedJudge?.user_id as any)?.email || "N/A",
+          track: (updatedJudge?.track_id as any)?.name || "N/A",
+          track_id: (updatedJudge?.track_id as any)?._id?.toString() || null,
         },
       },
       { status: 200 },
@@ -74,27 +137,26 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: Request,
+export const PATCH = proxy(PATCHHandler, ["admin"]);
+
+// DELETE: Remove judge
+async function DELETEHandler(
+  request: NextRequest,
   { params }: { params: Promise<{ judgeId: string }> },
 ) {
   await connectDB();
   const { judgeId } = await params;
 
   try {
-    // 1. Check if judge exists
     const judge = await Judge.findById(judgeId);
     if (!judge) {
       return NextResponse.json({ error: "Judge not found" }, { status: 404 });
     }
 
-    // 2. Delete Judge record
+    // Delete Judge record
     await Judge.findByIdAndDelete(judgeId);
 
-    // 3. Delete Assignments for this judge
-    await JudgeAssignment.deleteMany({ judge_id: judgeId });
-
-    // 4. Optionally delete User or revert role?
+    // Optionally delete User account
     await User.deleteOne({ _id: judge.user_id });
 
     return NextResponse.json({
@@ -108,3 +170,5 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = proxy(DELETEHandler, ["admin"]);

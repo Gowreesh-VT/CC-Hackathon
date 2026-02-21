@@ -1,28 +1,30 @@
-import mongoose, { Schema, Document, models, model } from "mongoose"
+import mongoose, { Schema, Document, models, model } from "mongoose";
 
 export interface ITeam extends Document {
-  team_name: string
-  track: string
-  rounds_accessible: mongoose.Types.ObjectId[]
-  created_at: Date
-  is_locked: boolean
-  is_shortlisted: boolean
-  is_eliminated: boolean
+  user_id: mongoose.Types.ObjectId;
+  team_name: string;
+  track_id: mongoose.Types.ObjectId;
+  rounds_accessible: mongoose.Types.ObjectId[];
+  created_at: Date;
 }
 
 const TeamSchema = new Schema<ITeam>({
+  user_id: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   team_name: { type: String, required: true, unique: true },
-  track: { type: String, required: true },
-  rounds_accessible: [
-    { type: Schema.Types.ObjectId, ref: "Round" },
-  ],
+  track_id: {
+    type: Schema.Types.ObjectId,
+    ref: "Track",
+    required: true,
+  },
+  rounds_accessible: [{ type: Schema.Types.ObjectId, ref: "Round" }],
   created_at: {
     type: Date,
     default: Date.now,
   },
-  is_locked: { type: Boolean, default: false },
-  is_shortlisted: { type: Boolean, default: false },
-  is_eliminated: { type: Boolean, default: false },
-})
+});
 
-export default models.Team || model<ITeam>("Team", TeamSchema)
+export default models.Team || model<ITeam>("Team", TeamSchema);

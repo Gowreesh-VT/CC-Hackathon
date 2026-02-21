@@ -4,8 +4,9 @@ import Team from "@/models/Team";
 import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import { proxy } from "@/lib/proxy";
 
-export async function GET() {
+async function GETHandler() {
   await connectDB();
 
   try {
@@ -44,33 +45,40 @@ export async function GET() {
       });
 
       // 4. Pending Evaluations
-      // Teams that have submitted but not yet scored
-      const scoredTeamIds = await Score.distinct("team_id", {
+      // Submissions that have no scores or pending scores
+      const allSubmissionsForRound = await Submission.find({
         round_id: currentRound._id,
+      }).lean();
+
+      const scoredSubmissionIds = await Score.distinct("submission_id", {
+        status: "scored",
       });
 
-      // Count submissions whose team_id is NOT in scoredTeamIds
-      // const pendingCount = await Submission.countDocuments({
-      //     round_id: currentRound._id,
-      //     team_id: { $nin: scoredTeamIds }
-      // });
-
-      // Simple math since 1 submission per team usually
-      pendingEvaluationCount = Math.max(
-        0,
-        submissionsCount - scoredTeamIds.length,
+      const scoredSubmissionIdsSet = new Set(
+        scoredSubmissionIds.map((id) => id.toString()),
       );
+
+      pendingEvaluationCount = allSubmissionsForRound.filter(
+        (sub) => !scoredSubmissionIdsSet.has(sub._id.toString()),
+      ).length;
     }
 
     // 5. Get top 5 teams based on cumulative score across all rounds
-    const allScores = await Score.find({}).lean();
+    const allScores = await Score.find({})
+      .populate({
+        path: "submission_id",
+        select: "team_id",
+      })
+      .lean();
 
     // Group scores by team and sum them up
     const teamsScoreMap = new Map<string, number>();
     allScores.forEach((score: any) => {
-      const teamId = score.team_id.toString();
-      const currentScore = teamsScoreMap.get(teamId) || 0;
-      teamsScoreMap.set(teamId, currentScore + (score.score || 0));
+      if (score.submission_id && score.submission_id.team_id) {
+        const teamId = score.submission_id.team_id.toString();
+        const currentScore = teamsScoreMap.get(teamId) || 0;
+        teamsScoreMap.set(teamId, currentScore + (score.score || 0));
+      }
     });
 
     // Convert to array, sort by score descending, and get top 5
@@ -79,12 +87,14 @@ export async function GET() {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
         .map(async ([teamId, cumulativeScore]) => {
-          const team = await Team.findById(teamId).lean();
+          const team = await Team.findById(teamId)
+            .populate("track_id", "name")
+            .lean();
           return {
             id: teamId,
             name: team?.team_name || "Unknown",
             cumulativeScore,
-            track: team?.track || "—",
+            track: (team?.track_id as any)?.name || "—",
           };
         }),
     );
@@ -113,3 +123,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = proxy(GETHandler, ["admin"]);

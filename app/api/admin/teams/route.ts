@@ -2,151 +2,84 @@ import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import User from "@/models/User";
-import Round from "@/models/Round";
+import Track from "@/models/Track";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import { teamSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
 
 export const dynamic = "force-dynamic";
 
-// GET: List all teams with details including scores from all rounds
+// GET: List all teams with their track information and scores
 async function GETHandler(req: NextRequest) {
   await connectDB();
 
   try {
     const teams = await Team.find({})
-      .populate({
-        path: "rounds_accessible",
-        model: Round,
-        select: "round_number title is_active",
-      })
+      .populate("user_id", "email")
+      .populate("track_id", "name")
+      .populate("rounds_accessible", "round_number")
       .lean();
 
-    // Fetch all rounds sorted by round number
-    const allRounds = await Round.find({}).sort({ round_number: 1 }).lean();
+    // Calculate scores for each team
+    const teamsWithScores = await Promise.all(
+      teams.map(async (team: any) => {
+        // Get all submissions for this team
+        const submissions = await Submission.find({ team_id: team._id })
+          .populate("round_id", "round_number")
+          .lean();
 
-    // Fetch active round
-    const activeRound = await Round.findOne({ is_active: true }).lean();
+        // Calculate scores per round
+        const roundScores = await Promise.all(
+          submissions.map(async (submission: any) => {
+            // Get all scores for this submission
+            const scores = await Score.find({
+              submission_id: submission._id,
+              status: "scored",
+            }).lean();
 
-    // Create a map of teamId -> boolean (submitted or not for active round)
-    const submissionMap = new Set();
-    if (activeRound) {
-      try {
-        const submissions = await Submission.find(
-          { round_id: activeRound._id },
-          "team_id",
-        ).lean();
-        submissions.forEach((s: any) => {
-          if (s.team_id) submissionMap.add(s.team_id.toString());
-        });
-      } catch (err) {
-        console.error("Error fetching submissions for active round:", err);
-      }
-    }
+            // Sum up all judge scores for this submission
+            const totalScore = scores.reduce(
+              (sum, scoreDoc) => sum + (scoreDoc.score || 0),
+              0,
+            );
 
-    // Fetch scores for ALL rounds
-    const roundScoresMap = new Map(); // Map<teamId, Map<roundId, score>>
-    try {
-      const scores = await Score.find({}).lean();
-      scores.forEach((s: any) => {
-        const teamId = s.team_id.toString();
-        const roundId = s.round_id.toString();
-
-        if (!roundScoresMap.has(teamId)) {
-          roundScoresMap.set(teamId, new Map());
-        }
-
-        const teamRoundMap = roundScoresMap.get(teamId);
-        const currentScore = teamRoundMap.get(roundId) || 0;
-        teamRoundMap.set(roundId, currentScore + (s.score || 0));
-      });
-    } catch (err) {
-      console.error("Error fetching scores:", err);
-    }
-
-    // Get score for active round
-    const scoreMap = new Map();
-    if (activeRound) {
-      try {
-        const scores = await Score.find({ round_id: activeRound._id }).lean();
-        scores.forEach((s: any) => {
-          const teamId = s.team_id.toString();
-          const currentScore = scoreMap.get(teamId) || 0;
-          scoreMap.set(teamId, currentScore + (s.score || 0));
-        });
-      } catch (err) {
-        console.error("Error fetching scores:", err);
-      }
-    }
-
-    const formattedTeams = teams.map((team) => {
-      const roundsAccessible = (team.rounds_accessible || []) as any[];
-
-      // Calculate effective round:
-      // 1. Start with Round 1 (implicit base)
-      let currentRoundNum = 1;
-      let currentRoundName = "Round 1";
-      let currentRoundId = null;
-
-      // 2. Check max accessible round
-      if (roundsAccessible.length > 0) {
-        const sorted = [...roundsAccessible].sort(
-          (a: any, b: any) => b.round_number - a.round_number,
+            return {
+              round_id: submission.round_id?._id?.toString() || null,
+              round_number: submission.round_id?.round_number || null,
+              score: totalScore,
+              num_judges: scores.length,
+            };
+          }),
         );
-        const maxRound = sorted[0];
 
-        if (maxRound && maxRound.round_number > 1) {
-          currentRoundNum = maxRound.round_number;
-          currentRoundName = `Round ${maxRound.round_number}`;
-          currentRoundId = maxRound._id.toString();
-        }
-      }
+        // Calculate cumulative score
+        const cumulativeScore = roundScores.reduce(
+          (sum, round) => sum + round.score,
+          0,
+        );
 
-      if (!currentRoundId && activeRound && activeRound.round_number === 1) {
-        currentRoundId = activeRound._id.toString();
-      }
-
-      const hasSubmitted = activeRound
-        ? submissionMap.has(team._id.toString())
-        : false;
-      const teamScore = scoreMap.get(team._id.toString()) ?? null;
-
-      // Build scores for all rounds
-      const roundScores = allRounds.map((round: any) => {
-        const teamRoundScores = roundScoresMap.get(team._id.toString());
-        const roundScore = teamRoundScores
-          ? teamRoundScores.get(round._id.toString())
-          : null;
         return {
-          roundId: round._id.toString(),
-          roundNumber: round.round_number,
-          score: roundScore,
+          id: team._id.toString(),
+          team_name: team.team_name,
+          email: team.user_id?.email || "N/A",
+          track: team.track_id?.name || "N/A",
+          track_id: team.track_id?._id?.toString() || null,
+          rounds_accessible: (team.rounds_accessible || []).map((r: any) => ({
+            id: r._id.toString(),
+            round_number: r.round_number,
+          })),
+          round_scores: roundScores.filter((rs) => rs.round_number !== null),
+          cumulative_score: cumulativeScore,
+          created_at: team.created_at,
         };
-      });
+      }),
+    );
 
-      let status = "pending";
-      if (team.is_eliminated) status = "eliminated";
-      else if (team.is_shortlisted) status = "shortlisted";
-      else if (team.is_locked) status = "locked";
-      else if (hasSubmitted) status = "submitted";
+    // Sort by cumulative score in descending order
+    teamsWithScores.sort((a, b) => b.cumulative_score - a.cumulative_score);
 
-      return {
-        id: team._id.toString(),
-        name: team.team_name,
-        track: team.track,
-        email: team.email,
-        isLocked: team.is_locked,
-        isShortlisted: team.is_shortlisted,
-        isEliminated: team.is_eliminated,
-        currentRoundId: currentRoundId,
-        currentRoundName: currentRoundName,
-        score: teamScore,
-        roundScores: roundScores,
-        submissionStatus: status,
-      };
-    });
-
-    return NextResponse.json(formattedTeams);
+    return NextResponse.json(teamsWithScores);
   } catch (error) {
     console.error("Error fetching teams:", error);
     return NextResponse.json(
@@ -158,30 +91,31 @@ async function GETHandler(req: NextRequest) {
 
 export const GET = proxy(GETHandler, ["admin"]);
 
-// POST: Add a new team (and create associated user)
+// POST: Create a new team
 async function POSTHandler(request: NextRequest) {
   await connectDB();
 
   try {
     const body = await request.json();
 
-    if (!body.name || !body.track || !body.email) {
+    const validation = teamSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name, track, and email are required" },
+        { error: validation.error.flatten().fieldErrors },
         { status: 400 },
       );
     }
 
-    // 0. Check for invalid or duplicate data
-    const existingUser = await User.findOne({ email: body.email });
-    if (existingUser && existingUser.role !== "team") {
-      return NextResponse.json(
-        { error: "Email already registered with a different role" },
-        { status: 400 },
-      );
+    const { team_name, email, track_id } = validation.data;
+
+    // Verify track exists
+    const track = await Track.findById(track_id);
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
 
-    const existingTeam = await Team.findOne({ team_name: body.name });
+    // Check if team name already exists
+    const existingTeam = await Team.findOne({ team_name });
     if (existingTeam) {
       return NextResponse.json(
         { error: "Team name already exists" },
@@ -189,30 +123,58 @@ async function POSTHandler(request: NextRequest) {
       );
     }
 
-    // 1. Create the Team
+    // Check if user exists
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // If user exists, check if they're already in a team
+      if (user.team_id) {
+        return NextResponse.json(
+          { error: "User is already part of a team" },
+          { status: 400 },
+        );
+      }
+
+      // If user has a different role, return error
+      if (user.role !== "team") {
+        return NextResponse.json(
+          { error: `Email is already registered as ${user.role}` },
+          { status: 400 },
+        );
+      }
+    } else {
+      // Create new user with team role
+      user = await User.create({
+        email,
+        role: "team",
+      });
+    }
+
+    // Create team
     const newTeam = await Team.create({
-      team_name: body.name,
-      track: body.track,
+      user_id: user._id,
+      team_name,
+      track_id,
     });
 
-    // 2. Create or Update the User (Team Leader)
-    // We upsert so if they logged in before, we just add the role and team_id
-    await User.findOneAndUpdate(
-      { email: body.email },
-      {
-        role: "team",
-        team_id: newTeam._id,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
+    // Update user with team_id
+    await User.findByIdAndUpdate(user._id, { team_id: newTeam._id });
+
+    // Populate the response
+    const populatedTeam = await Team.findById(newTeam._id)
+      .populate("user_id", "email")
+      .populate("track_id", "name")
+      .lean();
 
     return NextResponse.json(
       {
-        message: "Team added successfully",
+        message: "Team created successfully",
         team: {
-          id: newTeam._id.toString(),
-          name: newTeam.team_name,
-          track: newTeam.track,
+          id: populatedTeam._id.toString(),
+          team_name: populatedTeam.team_name,
+          email: (populatedTeam.user_id as any)?.email,
+          track: (populatedTeam.track_id as any)?.name,
+          track_id: (populatedTeam.track_id as any)?._id?.toString(),
         },
       },
       { status: 201 },

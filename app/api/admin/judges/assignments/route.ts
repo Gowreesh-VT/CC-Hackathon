@@ -1,46 +1,44 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/config/db";
-import JudgeAssignment from "@/models/JudgeAssignment";
+import Judge from "@/models/Judge";
 
-// GET: Fetch all judge assignments for a specific round
+// GET: Fetch all judge assignments
 export async function GET(request: Request) {
   await connectDB();
 
   try {
-    const { searchParams } = new URL(request.url);
-    const roundId = searchParams.get("round_id");
-
-    if (!roundId) {
-      return NextResponse.json(
-        { error: "round_id is required" },
-        { status: 400 },
-      );
-    }
-
-    // Fetch all judge assignments for this round
-    const assignments = await JudgeAssignment.find({
-      round_id: roundId,
-    })
-      .populate("judge_id", "_id name")
-      .populate("team_id", "_id name")
+    // Fetch all judges with their assigned teams
+    const judges = await Judge.find()
+      .populate("user_id", "email")
+      .populate("teams_assigned", "team_name")
+      .populate("track_id", "name")
       .lean();
 
     // Map to a more useful format
-    const assignmentData = assignments.map((a: any) => ({
-      judgeId: a.judge_id._id.toString(),
-      judgeName: a.judge_id.name,
-      teamId: a.team_id._id.toString(),
-      teamName: a.team_id.name,
-      roundId: a.round_id.toString(),
-      assignedAt: a.assigned_at,
-    }));
+    const assignmentData = judges.flatMap((judge: any) => {
+      return (judge.teams_assigned || []).map((team: any) => ({
+        judgeId: judge._id.toString(),
+        judges_email: judge.user_id?.email,
+        judge_name: judge.judge_name,
+        teamId: team._id.toString(),
+        teamName: team.team_name,
+        track: judge.track_id?.name,
+      }));
+    });
 
-    // Get list of all teams already assigned in this round
+    // Get list of all assigned team IDs
     const assignedTeamIds = [...new Set(assignmentData.map((a) => a.teamId))];
 
     return NextResponse.json({
       assignments: assignmentData,
       assignedTeamIds,
+      judges: judges.map((j: any) => ({
+        id: j._id.toString(),
+        judge_name: j.judge_name,
+        email: j.user_id?.email,
+        track: j.track_id?.name,
+        teams_count: (j.teams_assigned || []).length,
+      })),
     });
   } catch (error) {
     console.error("Error fetching judge assignments:", error);

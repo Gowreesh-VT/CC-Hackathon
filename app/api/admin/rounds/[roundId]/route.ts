@@ -1,15 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import Round from "@/models/Round";
-import mongoose from "mongoose";
+import Submission from "@/models/Submission";
+import RoundOptions from "@/models/RoundOptions";
+import { proxy } from "@/lib/proxy";
+import { z } from "zod";
+
+const updateRoundSchema = z.object({
+  round_number: z.number().int().positive().optional(),
+  start_time: z.string().datetime().optional(),
+  end_time: z.string().datetime().optional(),
+  instructions: z.string().optional(),
+  is_active: z.boolean().optional(),
+});
 
 // GET: Fetch a specific round
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ roundId: string }> }
+async function GETHandler(
+  request: NextRequest,
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
   await connectDB();
   const { roundId } = await params;
+
   try {
     const round = await Round.findById(roundId);
     if (!round) {
@@ -17,91 +29,99 @@ export async function GET(
     }
     return NextResponse.json(round);
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch round" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch round" },
+      { status: 500 },
+    );
   }
 }
 
-// PATCH: Handle actions (start, stop, toggle-submission)
-export async function PATCH(
-  request: Request,
+export const GET = proxy(GETHandler, ["admin"]);
+
+// PATCH: Update round (field updates or actions)
+async function PATCHHandler(
+  request: NextRequest,
   { params }: { params: Promise<{ roundId: string }> },
-) {
-  await connectDB();
-  const { roundId } = await params;
-  const body = await request.json(); // Expecting { action: "start" | "stop" | "toggle" }
-
-  try {
-    const round = await Round.findById(roundId);
-    if (!round) {
-      return NextResponse.json({ error: "Round not found" }, { status: 404 });
-    }
-
-    if (body.action === "start") {
-      round.is_active = true;
-    } else if (body.action === "stop") {
-      round.is_active = false;
-    } else if (body.action === "toggle-submission" || body.action === "toggle") {
-      round.submission_enabled = !round.submission_enabled;
-    } else {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    }
-
-    await round.save();
-
-    return NextResponse.json({
-      message: `Round updated: ${body.action} successful`,
-      round,
-      status: "updated",
-    });
-
-  } catch (error) {
-    console.error("Error updating round status:", error);
-    return NextResponse.json({ error: "Failed to update round" }, { status: 500 });
-  }
-}
-
-// PUT: Update round details (instructions, timed, etc)
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ roundId: string }> }
 ) {
   await connectDB();
   const { roundId } = await params;
 
   try {
     const body = await request.json();
-    const { instructions, start_time, end_time, round_number } = body;
 
-    const updatedRound = await Round.findByIdAndUpdate(
-      roundId,
-      {
-        instructions,
-        start_time: start_time ? new Date(start_time) : undefined,
-        end_time: end_time ? new Date(end_time) : undefined,
-        round_number // Optional if we allow reordering
-      },
-      { new: true }
-    );
+    // Check if this is an action request
+    if (body.action) {
+      const round = await Round.findById(roundId);
+      if (!round) {
+        return NextResponse.json({ error: "Round not found" }, { status: 404 });
+      }
+
+      if (body.action === "start" || body.action === "activate") {
+        // Deactivate all other rounds
+        await Round.updateMany({}, { is_active: false });
+        round.is_active = true;
+      } else if (body.action === "stop" || body.action === "deactivate") {
+        round.is_active = false;
+      } else {
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      }
+
+      await round.save();
+
+      return NextResponse.json({
+        message: `Round ${body.action} successful`,
+        round,
+      });
+    }
+
+    // Otherwise, update fields
+    const validation = updateRoundSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const updateData: any = {};
+    if (validation.data.round_number !== undefined)
+      updateData.round_number = validation.data.round_number;
+    if (validation.data.start_time)
+      updateData.start_time = new Date(validation.data.start_time);
+    if (validation.data.end_time)
+      updateData.end_time = new Date(validation.data.end_time);
+    if (validation.data.instructions !== undefined)
+      updateData.instructions = validation.data.instructions;
+    if (validation.data.is_active !== undefined)
+      updateData.is_active = validation.data.is_active;
+
+    const updatedRound = await Round.findByIdAndUpdate(roundId, updateData, {
+      new: true,
+    });
 
     if (!updatedRound) {
       return NextResponse.json({ error: "Round not found" }, { status: 404 });
     }
 
     return NextResponse.json({
-      message: "Round details updated",
-      round: updatedRound
+      message: "Round updated successfully",
+      round: updatedRound,
     });
-
   } catch (error) {
-    console.error("Error updating round details:", error);
-    return NextResponse.json({ error: "Failed to update round details" }, { status: 500 });
+    console.error("Error updating round:", error);
+    return NextResponse.json(
+      { error: "Failed to update round" },
+      { status: 500 },
+    );
   }
 }
 
+export const PATCH = proxy(PATCHHandler, ["admin"]);
+
 // DELETE: Delete a round and cascade to related data
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ roundId: string }> }
+async function DELETEHandler(
+  request: NextRequest,
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
   await connectDB();
   const { roundId } = await params;
@@ -113,23 +133,20 @@ export async function DELETE(
     }
 
     // Cascade Delete
-    // 1. Delete Subtasks for this round
-    await mongoose.connection.collection("subtasks").deleteMany({ round_id: roundId });
-    // 2. Delete Submissions for this round
-    await mongoose.connection.collection("submissions").deleteMany({ round_id: roundId });
-    // 3. Delete Team Selections for this round
-    await mongoose.connection.collection("teamsubtaskselections").deleteMany({ round_id: roundId });
-    // 4. Delete Scores for this round
-    await mongoose.connection.collection("scores").deleteMany({ round_id: roundId });
-    // 5. Delete Judge Assignments for this round
-    await mongoose.connection.collection("judgeassignments").deleteMany({ round_id: roundId });
+    await Submission.deleteMany({ round_id: roundId });
+    await RoundOptions.deleteMany({ round_id: roundId });
 
     return NextResponse.json({
       message: "Round deleted successfully",
-      details: "Cascaded delete to subtasks, submissions, selections, scores, and assignments."
+      details: "Cascaded delete to submissions and round options completed.",
     });
   } catch (error) {
     console.error("Error deleting round:", error);
-    return NextResponse.json({ error: "Failed to delete round" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete round" },
+      { status: 500 },
+    );
   }
 }
+
+export const DELETE = proxy(DELETEHandler, ["admin"]);

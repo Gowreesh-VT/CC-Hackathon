@@ -10,21 +10,28 @@ import mongoose from "mongoose";
 import { submissionSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
 
-async function POSTHandler(req: NextRequest) {
+async function POSTHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   // email checks are technically redundant with withRole but good for type safety/finding user
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
+  const { id: roundId } = await context.params;
   const body = await req.json();
 
-  const validation = submissionSchema.safeParse(body);
+  const validation = submissionSchema.safeParse({ ...body, roundId });
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+    return NextResponse.json(
+      { error: validation.error.flatten().fieldErrors },
+      { status: 400 },
+    );
   }
 
-  const { roundId, fileUrl, githubLink, overview } = validation.data;
+  const { fileUrl, githubLink, overview } = validation.data;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -63,20 +70,27 @@ async function POSTHandler(req: NextRequest) {
 
 export const POST = proxy(POSTHandler, ["team"]);
 
-async function PATCHHandler(req: NextRequest) {
+async function PATCHHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
+  const { id: roundId } = await context.params;
   const body = await req.json();
 
-  const validation = submissionSchema.safeParse(body);
+  const validation = submissionSchema.safeParse({ ...body, roundId });
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.flatten().fieldErrors }, { status: 400 });
+    return NextResponse.json(
+      { error: validation.error.flatten().fieldErrors },
+      { status: 400 },
+    );
   }
 
-  const { roundId, fileUrl, githubLink, overview } = validation.data;
+  const { fileUrl, githubLink, overview } = validation.data;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -128,11 +142,16 @@ async function PATCHHandler(req: NextRequest) {
 
 export const PATCH = proxy(PATCHHandler, ["team"]);
 
-async function GETHandler(req: NextRequest) {
+async function GETHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email)
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+
+  const { id: roundId } = await context.params;
 
   await connectDB();
   const user = await User.findOne({ email }).lean();
@@ -140,32 +159,43 @@ async function GETHandler(req: NextRequest) {
     return NextResponse.json({ error: "no team" }, { status: 400 });
 
   try {
-    const submissions = await Submission.find({ team_id: user.team_id })
-      .populate("round_id", "round_number title")
-      .sort({ submitted_at: -1 })
+    // Find submission for this specific round
+    const submission = await Submission.findOne({
+      team_id: user.team_id,
+      round_id: new mongoose.Types.ObjectId(roundId),
+    })
+      .populate("round_id", "round_number")
       .lean();
 
-    // Fetch scores for each submission
-    const submissionsWithScores = await Promise.all(
-      submissions.map(async (submission) => {
-        const score = await Score.findOne({
-          team_id: user.team_id,
-          round_id: submission.round_id._id,
-        }).lean();
-        return {
-          ...submission,
-          score: score
-            ? {
-              score: score.score,
-              status: score.status,
-              remarks: score.remarks,
-            }
-            : null,
-        };
-      }),
-    );
+    if (!submission) {
+      return NextResponse.json({
+        submission: null,
+        score: null,
+      });
+    }
 
-    return NextResponse.json(submissionsWithScores);
+    // Fetch scores for this submission
+    const scores = await Score.find({
+      submission_id: submission._id,
+      status: "scored",
+    }).lean();
+
+    const totalScore = scores.reduce((sum, s) => sum + (s.score || 0), 0);
+
+    const submissionWithScore = {
+      ...submission,
+      score:
+        scores.length > 0
+          ? {
+              score: totalScore,
+              status: "scored",
+              remarks: scores[0]?.remarks || "",
+              num_judges: scores.length,
+            }
+          : null,
+    };
+
+    return NextResponse.json(submissionWithScore);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
