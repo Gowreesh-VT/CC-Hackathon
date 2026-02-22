@@ -120,15 +120,15 @@ export default function AdminJudgesPage() {
   const currentJudgeRoundTeams = useMemo(() => {
     if (!roundAssignments?.assignments || !selectedJudgeId) return [];
     return roundAssignments.assignments
-      .filter((assignment) => assignment.judgeId === selectedJudgeId)
-      .map((assignment) => assignment.teamId);
+      .filter((assignment: any) => assignment.judgeId === selectedJudgeId)
+      .map((assignment: any) => assignment.teamId);
   }, [roundAssignments, selectedJudgeId]);
 
   const disabledTeamIds = useMemo(() => {
     if (!roundAssignments?.assignments || !selectedJudgeId) return [];
     return roundAssignments.assignments
-      .filter((assignment) => assignment.judgeId !== selectedJudgeId)
-      .map((assignment) => assignment.teamId);
+      .filter((assignment: any) => assignment.judgeId !== selectedJudgeId)
+      .map((assignment: any) => assignment.teamId);
   }, [roundAssignments, selectedJudgeId]);
 
   useEffect(() => {
@@ -198,8 +198,10 @@ export default function AdminJudgesPage() {
     try {
       await updateJudge({
         id: editJudgeId,
-        name: editJudgeName,
-        email: editJudgeEmail,
+        body: {
+          name: editJudgeName,
+          email: editJudgeEmail,
+        },
       }).unwrap();
       toast.success("Judge updated successfully");
       setEditDialogOpen(false);

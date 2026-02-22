@@ -39,7 +39,7 @@ import {
 import {
   useGetAdminDashboardQuery,
   useGetAdminRoundsQuery,
-  useToggleRoundStatusMutation,
+  useUpdateRoundMutation,
 } from "@/lib/redux/api/adminApi";
 import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { toast } from "sonner";
@@ -56,7 +56,7 @@ export default function AdminDashboardPage() {
     useGetAdminDashboardQuery();
   const { data: rounds = [], isLoading: roundsLoading } =
     useGetAdminRoundsQuery();
-  const [toggleRoundStatus] = useToggleRoundStatusMutation();
+  const [updateRound] = useUpdateRoundMutation();
 
   const loading = statsLoading || roundsLoading || !stats;
 
@@ -76,9 +76,9 @@ export default function AdminDashboardPage() {
   const handleStartRound = async () => {
     if (!selectedRoundId) return;
     try {
-      await toggleRoundStatus({
+      await updateRound({
         id: selectedRoundId,
-        action: "start",
+        body: { is_active: true },
       }).unwrap();
       toast.success("Round started successfully");
     } catch {
@@ -89,9 +89,9 @@ export default function AdminDashboardPage() {
   const handleStopRound = async () => {
     if (!selectedRoundId) return;
     try {
-      await toggleRoundStatus({
+      await updateRound({
         id: selectedRoundId,
-        action: "stop",
+        body: { is_active: false },
       }).unwrap();
       toast.success("Round stopped successfully");
     } catch {
@@ -103,9 +103,9 @@ export default function AdminDashboardPage() {
     setSubmissionToggled(checked);
     if (!selectedRoundId) return;
     try {
-      await toggleRoundStatus({
+      await updateRound({
         id: selectedRoundId,
-        action: "toggle-submission",
+        body: { submission_enabled: checked },
       }).unwrap();
       toast.success(`Submissions ${checked ? "enabled" : "disabled"}`);
     } catch {

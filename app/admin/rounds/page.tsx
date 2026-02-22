@@ -47,7 +47,7 @@ import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import {
   useGetAdminRoundsQuery,
   useCreateRoundMutation,
-  useToggleRoundStatusMutation,
+  useUpdateRoundMutation,
   useDeleteRoundMutation,
 } from "@/lib/redux/api/adminApi";
 import { toast } from "sonner";
@@ -65,7 +65,7 @@ export default function AdminRoundsPage() {
 
   const { data: rounds = [], isLoading } = useGetAdminRoundsQuery();
   const [createRound] = useCreateRoundMutation();
-  const [toggleRoundStatus] = useToggleRoundStatusMutation();
+  const [updateRound] = useUpdateRoundMutation();
   const [deleteRound] = useDeleteRoundMutation();
 
   const handleCreateRound = async () => {
@@ -90,7 +90,7 @@ export default function AdminRoundsPage() {
 
   const handleStartRound = async (id: string) => {
     try {
-      await toggleRoundStatus({ id, action: "start" }).unwrap();
+      await updateRound({ id, body: { is_active: true } }).unwrap();
       toast.success("Round started");
     } catch {
       toast.error("Failed to start round");
@@ -99,7 +99,7 @@ export default function AdminRoundsPage() {
 
   const handleStopRound = async (id: string) => {
     try {
-      await toggleRoundStatus({ id, action: "stop" }).unwrap();
+      await updateRound({ id, body: { is_active: false } }).unwrap();
       toast.success("Round stopped");
     } catch {
       toast.error("Failed to stop round");
@@ -107,8 +107,10 @@ export default function AdminRoundsPage() {
   };
 
   const handleToggleSubmission = async (id: string) => {
+    const round = rounds.find((r: any) => r._id === id);
+    if (!round) return;
     try {
-      await toggleRoundStatus({ id, action: "toggle-submission" }).unwrap();
+      await updateRound({ id, body: { submission_enabled: !round.submission_enabled } }).unwrap();
       toast.success("Submission status updated");
     } catch {
       toast.error("Failed to toggle submission");
@@ -301,7 +303,7 @@ export default function AdminRoundsPage() {
                               round.is_active
                                 ? "default"
                                 : round.end_time &&
-                                    new Date() > new Date(round.end_time)
+                                  new Date() > new Date(round.end_time)
                                   ? "secondary"
                                   : "outline"
                             }

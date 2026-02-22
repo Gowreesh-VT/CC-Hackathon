@@ -132,7 +132,8 @@ export default function JudgeRoundDetailsPage() {
       await submitScore({
         roundId,
         teamId: selectedTeamId,
-        scores: { score, remarks: dialogRemarks },
+        score,
+        remarks: dialogRemarks,
       }).unwrap();
 
       setEvaluations((prev) =>
@@ -193,8 +194,8 @@ export default function JudgeRoundDetailsPage() {
                     {i === 0
                       ? "Evaluations ongoing"
                       : i === 1
-                      ? "Teams remaining"
-                      : "Teams evaluated"}
+                        ? "Teams remaining"
+                        : "Teams evaluated"}
                   </p>
                 </>
               )}
@@ -224,53 +225,53 @@ export default function JudgeRoundDetailsPage() {
               <TableBody>
                 {isLoading
                   ? Array.from({ length: 6 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-40" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-20 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-12" />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Skeleton className="h-8 w-24 ml-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-12" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Skeleton className="h-8 w-24 ml-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                   : evaluations.map((e) => (
-                      <TableRow key={e.teamId}>
-                        <TableCell className="font-medium">
-                          {e.teamName}
-                        </TableCell>
-                        <TableCell>{e.taskName}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              e.status === "scored" ? "default" : "outline"
-                            }
-                          >
-                            {e.status === "scored" ? "Scored" : "Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {e.score !== null ? `${e.score}/10` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedTeamId(e.teamId)}
-                          >
-                            {e.status === "scored" ? "Edit" : "Evaluate"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    <TableRow key={e.teamId}>
+                      <TableCell className="font-medium">
+                        {e.teamName}
+                      </TableCell>
+                      <TableCell>{e.taskName}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            e.status === "scored" ? "default" : "outline"
+                          }
+                        >
+                          {e.status === "scored" ? "Scored" : "Pending"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {e.score !== null ? `${e.score}/10` : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedTeamId(e.teamId)}
+                        >
+                          {e.status === "scored" ? "Edit" : "Evaluate"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           </div>
