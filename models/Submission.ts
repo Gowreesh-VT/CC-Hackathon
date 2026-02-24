@@ -19,5 +19,7 @@ const SubmissionSchema = new Schema<ISubmission>({
   submitted_at: { type: Date, default: Date.now },
 });
 
+SubmissionSchema.index({ team_id: 1, round_id: 1 }, { unique: true });
+
 export default models.Submission ||
   model<ISubmission>("Submission", SubmissionSchema);

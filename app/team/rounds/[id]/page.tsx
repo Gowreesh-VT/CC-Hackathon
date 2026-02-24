@@ -84,9 +84,13 @@ export default function Page() {
   }
 
   const { round, subtask, submission, initialSubtasks, score } = data;
+  const hasAssignedSubtaskOptions =
+    Array.isArray(initialSubtasks) && initialSubtasks.length > 0;
+  const isRoundLocked = !round.is_active;
   const isRoundEnded =
     round.end_time &&
     new Date().getTime() > new Date(round.end_time).getTime();
+  const canInteractWithRound = !isRoundLocked && !isRoundEnded;
 
   const formatDate = (d?: string) =>
     d
@@ -163,54 +167,77 @@ export default function Page() {
         {submission ? (
           <Card>
             <CardHeader>
-              <CardTitle>Submission</CardTitle>
+              <CardTitle>
+                {isEditingSubmission ? "Edit Submission" : "Submission"}
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Submitted on {formatDate(submission.submitted_at)}
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
-
-              {submission.github_link && (
-                <a
-                  href={ensureAbsoluteUrl(submission.github_link)}
-                  target="_blank"
-                  className="block text-sm text-primary hover:underline"
-                >
-                  GitHub Repository
-                </a>
-              )}
-
-              {submission.overview && (
-                <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">
-                    OVERVIEW
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {submission.overview}
-                  </p>
-                </div>
-              )}
-
-              {score && (
-                <div className="rounded-lg border border-border bg-muted/50 p-4">
-                  <p className="text-sm font-semibold">
-                    Score: {score.score}/10
-                  </p>
-                  {score.remarks && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {score.remarks}
-                    </p>
+              {isEditingSubmission ? (
+                <SubmissionForm
+                  subtask={{ id: subtask._id, title: subtask.title }}
+                  roundId={id}
+                  isEditing
+                  disabled={!canInteractWithRound}
+                  submission={{
+                    github_link: submission.github_link,
+                    file_url: submission.file_url,
+                    overview: submission.overview,
+                  }}
+                  onSuccess={() => {
+                    setIsEditingSubmission(false);
+                    toast.success("Submission updated successfully.");
+                  }}
+                  onCancel={() => setIsEditingSubmission(false)}
+                />
+              ) : (
+                <>
+                  {submission.github_link && (
+                    <a
+                      href={ensureAbsoluteUrl(submission.github_link)}
+                      target="_blank"
+                      className="block text-sm text-primary hover:underline"
+                    >
+                      GitHub Repository
+                    </a>
                   )}
-                </div>
-              )}
 
-              {!isRoundEnded && (
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEditingSubmission(true)}
-                >
-                  Edit Submission
-                </Button>
+                  {submission.overview && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-muted-foreground">
+                        OVERVIEW
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm">
+                        {submission.overview}
+                      </p>
+                    </div>
+                  )}
+
+                  {score && (
+                    <div className="rounded-lg border border-border bg-muted/50 p-4">
+                      <p className="text-sm font-semibold">
+                        Score: {score.score}/10
+                      </p>
+                      {score.remarks && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {score.remarks}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {!isRoundEnded && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditingSubmission(true)}
+                      disabled={!canInteractWithRound}
+                    >
+                      Edit Submission
+                    </Button>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -225,6 +252,13 @@ export default function Page() {
                   <AlertCircle className="mx-auto mb-3 h-8 w-8 text-destructive" />
                   <p className="text-sm font-medium">
                     Submission window closed
+                  </p>
+                </div>
+              ) : isRoundLocked ? (
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-6 text-center">
+                  <Clock className="mx-auto mb-3 h-8 w-8 text-yellow-600" />
+                  <p className="text-sm font-medium">
+                    Round is locked. Submission is not allowed yet.
                   </p>
                 </div>
               ) : (
@@ -248,10 +282,14 @@ export default function Page() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">
-            Round {round.round_number} — Choose Your Subtask
+            Round {round.round_number}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Select one of the two assigned subtasks to work on. This cannot be changed after confirmation.
+            {isRoundLocked
+              ? "Round is locked. You can view details but cannot select/submits until admin starts it."
+              : hasAssignedSubtaskOptions
+              ? "Select one of the assigned subtasks to work on. This cannot be changed after confirmation."
+              : "Your team is shortlisted. Waiting for admin to assign your subtask options."}
           </p>
         </div>
         {round.end_time && (
@@ -269,13 +307,14 @@ export default function Page() {
         )}
       </header>
 
-      {(!initialSubtasks || initialSubtasks.length === 0) ? (
+      {!hasAssignedSubtaskOptions ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Clock className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
-            <p className="font-medium">No subtasks assigned yet</p>
+            <p className="font-medium">Subtask options not assigned yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              The admin hasn&apos;t assigned your subtask options for this round yet. Check back soon.
+              Your team cannot pick a subtask until admin allots options for this round.
+              Please contact admin or check back in a few minutes.
             </p>
           </CardContent>
         </Card>
@@ -299,6 +338,7 @@ export default function Page() {
                   className="w-full"
                   variant={selectedSubtaskId === task._id ? "default" : "outline"}
                   onClick={() => setSelectedSubtaskId(task._id)}
+                  disabled={!canInteractWithRound}
                 >
                   {selectedSubtaskId === task._id ? "✓ Selected" : "Select this task"}
                 </Button>
@@ -320,7 +360,7 @@ export default function Page() {
                 toast.error("Failed to confirm: " + (error?.data?.error || "Unknown error"));
               }
             }}
-            disabled={isSelecting}
+            disabled={isSelecting || !canInteractWithRound}
           >
             {isSelecting ? "Confirming..." : "Confirm Selection →"}
           </Button>

@@ -16,6 +16,8 @@ import Team from "@/models/Team";
 import Round from "@/models/Round";
 import RoundOptions from "@/models/RoundOptions";
 import Submission from "@/models/Submission";
+import Score from "@/models/Score";
+import Judge from "@/models/Judge";
 import { proxy } from "@/lib/proxy";
 
 export const dynamic = "force-dynamic";
@@ -53,11 +55,25 @@ async function GETHandler(request: NextRequest) {
       }
     }
 
-    // Fetch all submissions for this team
+    // Fetch all submissions for this team (all rounds)
     const submissions = await Submission.find({
       team_id: teamId,
-      round_id: { $in: accessibleRoundIds },
-    }).lean();
+    })
+      .sort({ submitted_at: -1 })
+      .lean();
+
+    // Group submissions by round (sorted latest first from query above)
+    const submissionsByRound = new Map<string, any[]>();
+    submissions.forEach((sub: any) => {
+      const roundId = sub.round_id.toString();
+      if (!submissionsByRound.has(roundId)) {
+        submissionsByRound.set(roundId, []);
+      }
+      submissionsByRound.get(roundId)!.push(sub);
+    });
+
+    // Team score aggregation intentionally hidden from team API response.
+    // Keep score visibility restricted to judge/admin flows.
 
     // Fetch current round subtask selection
     let currentRoundSubtask = null;
@@ -79,6 +95,11 @@ async function GETHandler(request: NextRequest) {
 
     // Fetch current round submission
     let currentRoundSubmission = null;
+    let currentRoundRemarks: Array<{
+      judge_name: string;
+      remark: string;
+      updated_at: Date | null;
+    }> = [];
     if (activeRound) {
       const submission = await Submission.findOne({
         team_id: teamId,
@@ -93,6 +114,26 @@ async function GETHandler(request: NextRequest) {
           submission_text: submission.overview,
           submitted_at: submission.submitted_at,
         };
+
+        const remarkScores = await Score.find({
+          submission_id: submission._id,
+          remarks: { $exists: true, $ne: "" },
+        })
+          .sort({ updated_at: -1 })
+          .populate({
+            path: "judge_id",
+            model: Judge,
+            select: "judge_name",
+          })
+          .lean();
+
+        currentRoundRemarks = remarkScores
+          .map((scoreDoc: any) => ({
+            judge_name: (scoreDoc.judge_id as any)?.judge_name || "Judge",
+            remark: scoreDoc.remarks,
+            updated_at: scoreDoc.updated_at || null,
+          }))
+          .filter((entry) => !!entry.remark);
       }
     }
 
@@ -112,7 +153,10 @@ async function GETHandler(request: NextRequest) {
         : null,
       current_round_subtask: currentRoundSubtask,
       current_round_submission: currentRoundSubmission,
-      // Note: Scores are NOT exposed to team - only judges and admins can see scores
+      current_round_remarks: currentRoundRemarks,
+      // total_score: totalScore,
+      // latest_round_score: latestRoundScore,
+      // all_round_scores: allRoundScores,
       rounds_accessible: accessibleRoundIds,
     });
 

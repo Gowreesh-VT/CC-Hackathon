@@ -11,6 +11,7 @@ import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import { scoreSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
+import { getAssignedTeamIdsForJudgeRound } from "@/lib/judgeAssignments";
 
 async function getJudgeFromSession() {
   const session = await getServerSession(authOptions);
@@ -64,7 +65,10 @@ async function GETHandler(
   // IDOR CHECK: Ensure the judge is assigned to this team
   const judgeSession = await getJudgeFromSession();
   if (judgeSession?.judge) {
-    const assignedTeamIds = judgeSession.judge.teams_assigned || [];
+    const assignedTeamIds = await getAssignedTeamIdsForJudgeRound(
+      judgeSession.judge._id.toString(),
+      round_id,
+    );
     const isAssigned = assignedTeamIds.some(
       (id: any) => id.toString() === team_id,
     );
@@ -191,7 +195,10 @@ async function POSTHandler(
   const { score: scoreValue, remarks } = validation.data;
 
   // Verify the judge is assigned to this team
-  const assignedTeamIds = ids.judge.teams_assigned || [];
+  const assignedTeamIds = await getAssignedTeamIdsForJudgeRound(
+    ids.judge._id.toString(),
+    round_id,
+  );
   const isAssigned = assignedTeamIds.some(
     (id: any) => id.toString() === team_id,
   );
@@ -296,7 +303,10 @@ async function PATCHHandler(
   const { score: scoreValue, remarks } = validation.data;
 
   // Verify the judge is assigned to this team
-  const assignedTeamIds = ids.judge.teams_assigned || [];
+  const assignedTeamIds = await getAssignedTeamIdsForJudgeRound(
+    ids.judge._id.toString(),
+    round_id,
+  );
   const isAssigned = assignedTeamIds.some(
     (id: any) => id.toString() === team_id,
   );

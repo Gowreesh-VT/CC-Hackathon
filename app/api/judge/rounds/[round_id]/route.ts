@@ -9,7 +9,10 @@ import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import RoundOptions from "@/models/RoundOptions";
+import Track from "@/models/Track";
+import Subtask from "@/models/Subtask";
 import { proxy } from "@/lib/proxy";
+import { getAssignedTeamIdsForJudgeRound } from "@/lib/judgeAssignments";
 
 async function getJudgeFromSession() {
   const session = await getServerSession(authOptions);
@@ -50,6 +53,8 @@ async function GETHandler(
       );
     }
   }
+  
+  const _forceInit = [Track.modelName, Subtask.modelName];
 
   // Verify round exists
   const round = await Round.findById(round_id);
@@ -63,8 +68,11 @@ async function GETHandler(
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
-  // Get all teams assigned to this judge
-  const assignedTeamIds = judgeSession.judge.teams_assigned || [];
+  // Get all teams assigned to this judge for this round
+  const assignedTeamIds = await getAssignedTeamIdsForJudgeRound(
+    judgeSession.judge._id.toString(),
+    round_id,
+  );
 
   // Get all teams assigned to this judge (regardless of rounds_accessible)
   const teams = await Team.find({
@@ -117,19 +125,19 @@ async function GETHandler(
         track_id: (teamWithTrack?.track_id as any)?._id?.toString() || null,
         selected_subtask: selection?.selected
           ? {
-              id: (selection.selected as any)._id.toString(),
-              title: (selection.selected as any).title,
-              description: (selection.selected as any).description,
-            }
+            id: (selection.selected as any)._id.toString(),
+            title: (selection.selected as any).title,
+            description: (selection.selected as any).description,
+          }
           : null,
         submission: submission
           ? {
-              id: submission._id.toString(),
-              github_link: submission.github_link || null,
-              file_url: submission.file_url || null,
-              overview: submission.overview || null,
-              submitted_at: submission.submitted_at,
-            }
+            id: submission._id.toString(),
+            github_link: submission.github_link || null,
+            file_url: submission.file_url || null,
+            overview: submission.overview || null,
+            submitted_at: submission.submitted_at,
+          }
           : null,
         score: scoreData,
       };

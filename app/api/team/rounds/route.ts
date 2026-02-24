@@ -75,6 +75,7 @@ export async function GEThandler(request: NextRequest) {
       const roundIdStr = round._id.toString();
       const selection = selectionByRound.get(roundIdStr);
       const submission = submissionByRound.get(roundIdStr);
+      const hasSelected = !!selection?.selected;
 
       return {
         _id: round._id,
@@ -82,7 +83,7 @@ export async function GEThandler(request: NextRequest) {
         start_time: round.start_time,
         end_time: round.end_time,
         is_active: round.is_active,
-        has_selected: !!selection,
+        has_selected: hasSelected,
         selected_subtask_id: selection?.selected ?? null,
         has_submitted: !!submission,
         submission_locked: submission?.is_locked ?? false,

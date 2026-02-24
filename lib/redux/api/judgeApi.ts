@@ -1,6 +1,7 @@
 import { baseApi } from "./baseApi";
 
 export const judgeApi = baseApi.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     getJudgeProfile: builder.query<any, void>({
       query: () => "/judge",

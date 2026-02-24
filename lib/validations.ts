@@ -1,5 +1,30 @@
 import { z } from "zod";
 
+function isGitHubUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return host === "github.com" || host.endsWith(".github.com");
+  } catch {
+    return false;
+  }
+}
+
+function isGoogleDriveOrDocsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return (
+      host === "drive.google.com" ||
+      host.endsWith(".drive.google.com") ||
+      host === "docs.google.com" ||
+      host.endsWith(".docs.google.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const scoreSchema = z.object({
   score: z
     .number()
@@ -11,8 +36,24 @@ export const scoreSchema = z.object({
 
 export const submissionSchema = z.object({
   roundId: z.string().min(1, "Round ID is required"),
-  fileUrl: z.string().url("Invalid file URL").optional().or(z.literal("")),
-  githubLink: z.string().url("Invalid GitHub URL").optional().or(z.literal("")),
+  fileUrl: z
+    .string()
+    .url("Invalid file URL")
+    .refine(
+      (value) => isGoogleDriveOrDocsUrl(value),
+      "File URL must be a Google Drive or Google Docs link",
+    )
+    .optional()
+    .or(z.literal("")),
+  githubLink: z
+    .string()
+    .url("Invalid GitHub URL")
+    .refine(
+      (value) => isGitHubUrl(value),
+      "GitHub URL must be from github.com",
+    )
+    .optional()
+    .or(z.literal("")),
   overview: z.string().optional(),
 });
 

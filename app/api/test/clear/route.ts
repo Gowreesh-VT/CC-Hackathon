@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/config/db";
 import User from "@/models/User";
 import Team from "@/models/Team";
@@ -9,8 +9,10 @@ import Subtask from "@/models/Subtask";
 import RoundOptions from "@/models/RoundOptions";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import JudgeAssignment from "@/models/JudgeAssignment";
+import { proxy } from "@/lib/proxy";
 
-export async function GET() {
+async function GETHandler(_request: NextRequest) {
   try {
     await connectDB();
 
@@ -24,6 +26,7 @@ export async function GET() {
       RoundOptions.deleteMany({}),
       Submission.deleteMany({}),
       Score.deleteMany({}),
+      JudgeAssignment.deleteMany({}),
     ]);
 
     return NextResponse.json({
@@ -38,6 +41,7 @@ export async function GET() {
         roundOptions: results[6].deletedCount,
         submissions: results[7].deletedCount,
         scores: results[8].deletedCount,
+        judgeAssignments: results[9].deletedCount,
       },
     });
   } catch (error: any) {
@@ -47,3 +51,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = proxy(GETHandler, ["admin"]);
