@@ -11,6 +11,7 @@ import {
 } from "./types";
 
 export const adminApi = baseApi.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     getAdminDashboard: builder.query<AdminDashboard, void>({
       query: () => "/admin",

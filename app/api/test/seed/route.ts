@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import seedDatabase from "./seed";
+import { proxy } from "@/lib/proxy";
 
-export async function GET() {
+async function GETHandler(_request: NextRequest) {
   try {
     const result = await seedDatabase();
 
@@ -29,3 +30,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = proxy(GETHandler, ["admin"]);

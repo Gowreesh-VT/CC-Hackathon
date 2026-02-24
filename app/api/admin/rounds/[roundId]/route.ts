@@ -3,6 +3,7 @@ import { connectDB } from "@/config/db";
 import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import RoundOptions from "@/models/RoundOptions";
+import JudgeAssignment from "@/models/JudgeAssignment";
 import { proxy } from "@/lib/proxy";
 import { z } from "zod";
 
@@ -135,10 +136,12 @@ async function DELETEHandler(
     // Cascade Delete
     await Submission.deleteMany({ round_id: roundId });
     await RoundOptions.deleteMany({ round_id: roundId });
+    await JudgeAssignment.deleteMany({ round_id: roundId });
 
     return NextResponse.json({
       message: "Round deleted successfully",
-      details: "Cascaded delete to submissions and round options completed.",
+      details:
+        "Cascaded delete to submissions, round options, and judge assignments completed.",
     });
   } catch (error) {
     console.error("Error deleting round:", error);
