@@ -43,7 +43,6 @@ export default function TeamSubmissionsPage() {
                       "Submitted At",
                       "Links",
                       "Overview",
-                      "Score",
                       "Status",
                       "Remarks",
                     ].map((h) => (
@@ -124,7 +123,6 @@ export default function TeamSubmissionsPage() {
                     <th className="px-6 py-3 text-left">
                       Overview
                     </th>
-                    <th className="px-6 py-3 text-left">Score</th>
                     <th className="px-6 py-3 text-left">
                       Status
                     </th>
@@ -179,18 +177,6 @@ export default function TeamSubmissionsPage() {
                         title={sub.overview}
                       >
                         {sub.overview || "-"}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {sub.score ? (
-                          <span className="font-semibold text-primary">
-                            {sub.score.score}/100
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            -
-                          </span>
-                        )}
                       </td>
 
                       <td className="px-6 py-4">

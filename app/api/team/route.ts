@@ -15,6 +15,7 @@ import { getTeamSession } from "@/lib/getTeamSession";
 import Team from "@/models/Team";
 import Round from "@/models/Round";
 import RoundOptions from "@/models/RoundOptions";
+import "@/models/Subtask";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import Judge from "@/models/Judge";

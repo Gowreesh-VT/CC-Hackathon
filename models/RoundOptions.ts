@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, models, model } from "mongoose";
+import "./Subtask";
 
 export interface IRoundOptions extends Document {
   team_id: mongoose.Types.ObjectId;
