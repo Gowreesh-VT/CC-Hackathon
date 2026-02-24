@@ -35,7 +35,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   useGetAdminTeamsQuery,
-  useGetAdminRoundsQuery,
   useGetTracksQuery,
   useCreateTeamMutation,
   useDeleteTeamMutation,
@@ -45,6 +44,8 @@ import {
 interface BatchRow {
   team_name: string;
   email: string;
+  mobile_number: string;
+  team_size: string;
   track_id: string;
 }
 
@@ -54,7 +55,6 @@ export default function TeamsPage() {
 
   const router = useRouter();
   const { data: teams = [], isLoading } = useGetAdminTeamsQuery();
-  const { data: rounds = [] } = useGetAdminRoundsQuery();
   const { data: tracks = [] } = useGetTracksQuery();
   const [createTeam] = useCreateTeamMutation();
   const [deleteTeam] = useDeleteTeamMutation();
@@ -64,33 +64,65 @@ export default function TeamsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
   const [newTeamEmail, setNewTeamEmail] = useState("");
+  const [newTeamMobileNumber, setNewTeamMobileNumber] = useState("");
+  const [newTeamSize, setNewTeamSize] = useState("1");
   const [newTeamTrackId, setNewTeamTrackId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Batch create state
   const [batchOpen, setBatchOpen] = useState(false);
-  const [batchRows, setBatchRows] = useState<BatchRow[]>([{ team_name: "", email: "", track_id: "" }]);
+  const [batchRows, setBatchRows] = useState<BatchRow[]>([
+    {
+      team_name: "",
+      email: "",
+      mobile_number: "",
+      team_size: "1",
+      track_id: "",
+    },
+  ]);
   const [isBatchCreating, setIsBatchCreating] = useState(false);
 
-  // Derive all unique round numbers from team scores for table columns
-  const allRounds = Array.from(
-    new Set(
-      teams.flatMap((t) => (t.round_scores ?? []).map((rs) => rs.round_number ?? rs.round_id))
-    )
-  ).sort();
+  const filteredTeams = teams.filter((team) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return (
+      team.team_name?.toLowerCase().includes(query) ||
+      team.email?.toLowerCase().includes(query) ||
+      team.mobile_number?.toLowerCase().includes(query) ||
+      team.track?.toLowerCase().includes(query)
+    );
+  });
 
   const handleCreateTeam = async () => {
-    if (!newTeamName || !newTeamEmail || !newTeamTrackId) {
+    const parsedTeamSize = Number(newTeamSize);
+    if (
+      !newTeamName ||
+      !newTeamEmail ||
+      !newTeamMobileNumber ||
+      !newTeamTrackId ||
+      !Number.isFinite(parsedTeamSize) ||
+      parsedTeamSize < 1
+    ) {
       toast.error("Please fill all fields");
       return;
     }
     setIsCreating(true);
     try {
-      await createTeam({ team_name: newTeamName, email: newTeamEmail, track_id: newTeamTrackId }).unwrap();
+      await createTeam({
+        team_name: newTeamName,
+        email: newTeamEmail,
+        mobile_number: newTeamMobileNumber,
+        team_size: Math.trunc(parsedTeamSize),
+        track_id: newTeamTrackId,
+      }).unwrap();
       toast.success("Team created");
       setCreateOpen(false);
       setNewTeamName("");
       setNewTeamEmail("");
+      setNewTeamMobileNumber("");
+      setNewTeamSize("1");
       setNewTeamTrackId("");
     } catch {
       toast.error("Error creating team");
@@ -110,17 +142,43 @@ export default function TeamsPage() {
   };
 
   const handleBatchCreate = async () => {
-    const valid = batchRows.filter((r) => r.team_name && r.email && r.track_id);
+    const valid = batchRows
+      .map((r) => ({ ...r, parsedTeamSize: Number(r.team_size) }))
+      .filter(
+        (r) =>
+          r.team_name &&
+          r.email &&
+          r.mobile_number &&
+          r.track_id &&
+          Number.isFinite(r.parsedTeamSize) &&
+          r.parsedTeamSize >= 1,
+      );
     if (valid.length === 0) {
       toast.error("Please fill at least one complete row");
       return;
     }
     setIsBatchCreating(true);
     try {
-      await batchCreateTeams({ teams: valid }).unwrap();
+      await batchCreateTeams({
+        teams: valid.map((r) => ({
+          team_name: r.team_name,
+          email: r.email,
+          mobile_number: r.mobile_number,
+          team_size: Math.trunc(r.parsedTeamSize),
+          track_id: r.track_id,
+        })),
+      }).unwrap();
       toast.success(`${valid.length} teams created`);
       setBatchOpen(false);
-      setBatchRows([{ team_name: "", email: "", track_id: "" }]);
+      setBatchRows([
+        {
+          team_name: "",
+          email: "",
+          mobile_number: "",
+          team_size: "1",
+          track_id: "",
+        },
+      ]);
     } catch {
       toast.error("Error creating teams");
     } finally {
@@ -132,7 +190,17 @@ export default function TeamsPage() {
     setBatchRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
-  const addBatchRow = () => setBatchRows((prev) => [...prev, { team_name: "", email: "", track_id: "" }]);
+  const addBatchRow = () =>
+    setBatchRows((prev) => [
+      ...prev,
+      {
+        team_name: "",
+        email: "",
+        mobile_number: "",
+        team_size: "1",
+        track_id: "",
+      },
+    ]);
   const removeBatchRow = (index: number) =>
     setBatchRows((prev) => prev.filter((_, i) => i !== index));
 
@@ -156,7 +224,7 @@ export default function TeamsPage() {
               </DialogHeader>
               <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-1">
                 {batchRows.map((row, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_120px_1fr_auto] gap-2 items-end">
                     <div className="space-y-1">
                       {i === 0 && <Label className="text-xs">Team Name</Label>}
                       <Input
@@ -172,6 +240,24 @@ export default function TeamsPage() {
                         placeholder="Email"
                         value={row.email}
                         onChange={(e) => updateBatchRow(i, "email", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      {i === 0 && <Label className="text-xs">Mobile Number</Label>}
+                      <Input
+                        placeholder="Mobile"
+                        value={row.mobile_number}
+                        onChange={(e) => updateBatchRow(i, "mobile_number", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      {i === 0 && <Label className="text-xs">Team Size</Label>}
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="Size"
+                        value={row.team_size}
+                        onChange={(e) => updateBatchRow(i, "team_size", e.target.value)}
                       />
                     </div>
                     <div className="space-y-1">
@@ -201,7 +287,16 @@ export default function TeamsPage() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancel</Button>
                 <Button onClick={handleBatchCreate} disabled={isBatchCreating}>
-                  {isBatchCreating ? "Creating..." : `Create ${batchRows.filter((r) => r.team_name && r.email && r.track_id).length} teams`}
+                  {isBatchCreating
+                    ? "Creating..."
+                    : `Create ${batchRows.filter(
+                        (r) =>
+                          r.team_name &&
+                          r.email &&
+                          r.mobile_number &&
+                          r.track_id &&
+                          Number(r.team_size) >= 1,
+                      ).length} teams`}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -222,6 +317,24 @@ export default function TeamsPage() {
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Input type="email" value={newTeamEmail} onChange={(e) => setNewTeamEmail(e.target.value)} placeholder="team@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mobile Number</Label>
+                  <Input
+                    value={newTeamMobileNumber}
+                    onChange={(e) => setNewTeamMobileNumber(e.target.value)}
+                    placeholder="9876543210"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Team Size</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={newTeamSize}
+                    onChange={(e) => setNewTeamSize(e.target.value)}
+                    placeholder="1"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Track</Label>
@@ -246,7 +359,15 @@ export default function TeamsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Teams ({teams.length})</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>All Teams ({filteredTeams.length})</CardTitle>
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by team, email, mobile, or track..."
+              className="w-full sm:max-w-sm"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -254,22 +375,21 @@ export default function TeamsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Mobile</TableHead>
+                  <TableHead className="text-right">Team Size</TableHead>
                   <TableHead>Track</TableHead>
-                  {rounds.map((r) => (
-                    <TableHead key={r._id} className="text-right">Rd {r.round_number}</TableHead>
-                  ))}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teams.length === 0 ? (
+                {filteredTeams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3 + rounds.length} className="text-center text-muted-foreground py-8">
-                      No teams yet
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      {teams.length === 0 ? "No teams yet" : "No teams match your search"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  teams.map((team) => (
+                  filteredTeams.map((team) => (
                     <TableRow key={team.id}>
                       <TableCell>
                         <a
@@ -280,26 +400,22 @@ export default function TeamsPage() {
                         </a>
                       </TableCell>
                       <TableCell>
+                        {team.mobile_number || (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {team.team_size ?? (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {team.track ? (
                           <Badge variant="outline">{team.track}</Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </TableCell>
-                      {rounds.map((r) => {
-                        const rs = (team.round_scores ?? []).find(
-                          (s) => s.round_id === r._id
-                        );
-                        return (
-                          <TableCell key={r._id} className="text-right tabular-nums">
-                            {rs?.score != null ? (
-                              <span className="font-semibold">{rs.score}</span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button

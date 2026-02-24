@@ -8,6 +8,9 @@ import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * POST /api/admin/teams/bulk
  *
@@ -62,6 +65,19 @@ export async function POST(request: NextRequest) {
         const teamName: string = (t.team_name ?? t.name ?? "").trim();
         const email: string = (t.email ?? "").trim();
         const trackName: string = (t.track ?? "").trim();
+        const mobileNumber: string = (
+          t.mobile_number ??
+          t.mobile ??
+          ""
+        )
+          .toString()
+          .trim();
+        const parsedTeamSize = Number(
+          t.team_size ?? t.teamsize ?? t.teamSize ?? 1,
+        );
+        const teamSize = Number.isFinite(parsedTeamSize) && parsedTeamSize >= 1
+          ? Math.trunc(parsedTeamSize)
+          : 1;
 
         if (!teamName || !email) {
           errors.push({ team: t, error: "Missing name/team_name or email" });
@@ -72,7 +88,7 @@ export async function POST(request: NextRequest) {
         let trackId: any = null;
         if (trackName) {
           const trackDoc = await Track.findOne({
-            name: { $regex: new RegExp(`^${trackName}$`, "i") },
+            name: { $regex: new RegExp(`^${escapeRegex(trackName)}$`, "i") },
           });
           if (trackDoc) {
             trackId = trackDoc._id;
@@ -129,6 +145,8 @@ export async function POST(request: NextRequest) {
           team_name: teamName,
           track_id: trackId,
           user_id: user._id,
+          mobile_number: mobileNumber,
+          team_size: teamSize,
         });
 
         // Link team back to user
@@ -161,4 +179,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

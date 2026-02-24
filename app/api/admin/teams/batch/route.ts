@@ -103,6 +103,8 @@ async function POSTHandler(request: NextRequest) {
         const newTeam = await Team.create({
           user_id: user._id,
           team_name: teamData.team_name,
+          mobile_number: teamData.mobile_number,
+          team_size: teamData.team_size,
           track_id: teamData.track_id,
         });
 
@@ -119,6 +121,8 @@ async function POSTHandler(request: NextRequest) {
           id: populatedTeam._id.toString(),
           team_name: populatedTeam.team_name,
           email: (populatedTeam.user_id as any)?.email,
+          mobile_number: populatedTeam.mobile_number || "",
+          team_size: populatedTeam.team_size ?? null,
           track: (populatedTeam.track_id as any)?.name,
           track_id: (populatedTeam.track_id as any)?._id?.toString(),
         });
