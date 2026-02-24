@@ -18,6 +18,7 @@ import RoundOptions from "@/models/RoundOptions";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import Judge from "@/models/Judge";
+import "@/models/Track";
 import { proxy } from "@/lib/proxy";
 
 export const dynamic = "force-dynamic";
