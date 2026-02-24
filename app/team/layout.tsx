@@ -1,18 +1,22 @@
+import SidebarLayout from "@/components/sidebar-layout";
 import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
-type TeamLayoutProps = {
+export default async function TeamLayout({
+  children,
+}: {
   children: React.ReactNode;
-};
-
-export default async function TeamLayout({ children }: TeamLayoutProps) {
+}) {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
 
-  if (role !== "team") {
+  if (!session) {
     redirect("/login");
   }
 
-  return <>{children}</>;
+  if (role && role !== "team") {
+    redirect("/login");
+  }
+  return <SidebarLayout>{children}</SidebarLayout>;
 }
