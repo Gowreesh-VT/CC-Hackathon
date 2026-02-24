@@ -8,6 +8,10 @@ import Team from "@/models/Team";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import { proxy } from "@/lib/proxy";
+import {
+  getAssignedTeamIdsForJudge,
+  getAssignedTeamIdsForJudgeRound,
+} from "@/lib/judgeAssignments";
 
 /**
  * GET /api/judge/assigned-teams
@@ -35,7 +39,13 @@ async function GETHandler(request: NextRequest) {
     return NextResponse.json({ error: "Judge not found" }, { status: 404 });
   }
 
-  const assignedTeamIds: any[] = (judge as any).teams_assigned ?? [];
+  const { searchParams } = new URL(request.url);
+  const roundId = searchParams.get("round_id");
+
+  const assignedTeamIds = roundId
+    ? await getAssignedTeamIdsForJudgeRound((judge as any)._id.toString(), roundId)
+    : await getAssignedTeamIdsForJudge((judge as any)._id.toString());
+
   if (assignedTeamIds.length === 0) {
     return NextResponse.json([]);
   }
@@ -43,9 +53,6 @@ async function GETHandler(request: NextRequest) {
   const teams = await Team.find({ _id: { $in: assignedTeamIds } })
     .select("_id team_name track_id")
     .lean();
-
-  const { searchParams } = new URL(request.url);
-  const roundId = searchParams.get("round_id");
 
   if (roundId) {
     // ── Round-specific: find submission + score for each team ──

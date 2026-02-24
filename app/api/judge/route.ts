@@ -9,6 +9,10 @@ import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import { proxy } from "@/lib/proxy";
+import {
+  getAssignedTeamIdsForJudge,
+  getAssignedTeamIdsForJudgeRound,
+} from "@/lib/judgeAssignments";
 
 async function GETHandler(request: NextRequest) {
   await connectDB();
@@ -28,7 +32,6 @@ async function GETHandler(request: NextRequest) {
     const judge = await Judge.findOne({ user_id: user._id })
       .populate("user_id", "email")
       .populate("track_id", "name description")
-      .populate("teams_assigned", "team_name track_id")
       .lean();
 
     if (!judge) {
@@ -38,8 +41,16 @@ async function GETHandler(request: NextRequest) {
     // Get active round
     const activeRound = await Round.findOne({ is_active: true }).lean();
 
-    // Get all teams assigned to this judge
-    const assignedTeamIds = judge.teams_assigned?.map((t: any) => t._id) || [];
+    const assignedTeamIds = activeRound
+      ? await getAssignedTeamIdsForJudgeRound(
+          judge._id.toString(),
+          activeRound._id.toString(),
+        )
+      : await getAssignedTeamIdsForJudge(judge._id.toString());
+
+    const assignedTeams = await Team.find({ _id: { $in: assignedTeamIds } })
+      .select("_id team_name")
+      .lean();
 
     // Get submissions count and status for assigned teams
     const totalSubmissions = await Submission.countDocuments({
@@ -110,11 +121,10 @@ async function GETHandler(request: NextRequest) {
       },
       teams_assigned: {
         count: assignedTeamIds.length,
-        teams:
-          (judge.teams_assigned as any[])?.map((t: any) => ({
-            id: t._id.toString(),
-            name: t.team_name,
-          })) || [],
+        teams: assignedTeams.map((t: any) => ({
+          id: t._id.toString(),
+          name: t.team_name,
+        })),
       },
       active_round: activeRound
         ? {
