@@ -1,6 +1,7 @@
 import { baseApi } from "./baseApi";
 
 export const teamApi = baseApi.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     getTeamProfile: builder.query<any, void>({
       query: () => "/team",
@@ -17,12 +18,6 @@ export const teamApi = baseApi.injectEndpoints({
     getTeamRoundDetails: builder.query<any, string>({
       query: (id) => `/team/rounds/${id}`,
       providesTags: (result, error, id) => [{ type: "Round", id }],
-    }),
-    getRandomSubtask: builder.query<any, string>({
-      query: (roundId) => `/team/subtasks/random?round_id=${roundId}`,
-      providesTags: (result, error, roundId) => [
-        { type: "Subtask", id: `round_${roundId}` },
-      ],
     }),
     selectSubtask: builder.mutation<
       any,
@@ -94,22 +89,6 @@ export const teamApi = baseApi.injectEndpoints({
       query: () => "/team/submission",
       providesTags: ["Submission"],
     }),
-    submitProject: builder.mutation<any, any>({
-      query: (body) => ({
-        url: "/team/submission",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Submission", "Round", "Team"],
-    }),
-    updateSubmission: builder.mutation<any, any>({
-      query: (body) => ({
-        url: "/team/submission",
-        method: "PATCH",
-        body,
-      }),
-      invalidatesTags: ["Submission", "Round", "Team"],
-    }),
   }),
 });
 
@@ -118,13 +97,10 @@ export const {
   useGetTeamDashboardQuery,
   useGetTeamRoundsQuery,
   useGetTeamRoundDetailsQuery,
-  useGetRandomSubtaskQuery,
   useSelectSubtaskMutation,
   useGetTeamRoundSubtaskQuery,
   useGetTeamRoundSubmissionQuery,
   useSubmitRoundSubmissionMutation,
   useUpdateRoundSubmissionMutation,
   useGetTeamSubmissionsQuery,
-  useSubmitProjectMutation,
-  useUpdateSubmissionMutation,
 } = teamApi;

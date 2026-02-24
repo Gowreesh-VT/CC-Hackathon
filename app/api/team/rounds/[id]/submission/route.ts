@@ -3,12 +3,25 @@ import { connectDB } from "@/config/db";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import User from "@/models/User";
+import Team from "@/models/Team";
 import Round from "@/models/Round";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
 import { submissionSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
+
+function canAccessRound(team: any, round: any) {
+  const accessibleRoundIds = new Set(
+    (team.rounds_accessible || []).map((rid: any) => rid.toString()),
+  );
+
+  if (round.round_number === 1) {
+    return round.is_active || accessibleRoundIds.has(round._id.toString());
+  }
+
+  return accessibleRoundIds.has(round._id.toString());
+}
 
 async function POSTHandler(
   req: NextRequest,
@@ -39,10 +52,29 @@ async function POSTHandler(
     return NextResponse.json({ error: "no team" }, { status: 400 });
 
   try {
+    const team = await Team.findById(user.team_id).lean();
+    if (!team) {
+      return NextResponse.json({ error: "team not found" }, { status: 404 });
+    }
+
     // Check if round exists
     const round = await Round.findById(roundId).lean();
     if (!round) {
       return NextResponse.json({ error: "round not found" }, { status: 404 });
+    }
+
+    if (!canAccessRound(team, round)) {
+      return NextResponse.json(
+        { error: "you do not have access to this round" },
+        { status: 403 },
+      );
+    }
+
+    if (!round.is_active) {
+      return NextResponse.json(
+        { error: "round is locked. submissions are not allowed yet" },
+        { status: 403 },
+      );
     }
 
     // Check if submission deadline has passed (skip check if no end_time set)
@@ -57,6 +89,17 @@ async function POSTHandler(
       }
     }
 
+    const existingSubmission = await Submission.findOne({
+      team_id: user.team_id,
+      round_id: new mongoose.Types.ObjectId(roundId),
+    }).lean();
+    if (existingSubmission) {
+      return NextResponse.json(
+        { error: "submission already exists for this round" },
+        { status: 409 },
+      );
+    }
+
     const doc = await Submission.create({
       team_id: user.team_id,
       round_id: new mongoose.Types.ObjectId(roundId),
@@ -66,6 +109,12 @@ async function POSTHandler(
     });
     return NextResponse.json({ ok: true, submission: doc });
   } catch (err: any) {
+    if (err?.code === 11000) {
+      return NextResponse.json(
+        { error: "submission already exists for this round" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -100,10 +149,29 @@ async function PATCHHandler(
     return NextResponse.json({ error: "no team" }, { status: 400 });
 
   try {
+    const team = await Team.findById(user.team_id).lean();
+    if (!team) {
+      return NextResponse.json({ error: "team not found" }, { status: 404 });
+    }
+
     // Check if round exists
     const round = await Round.findById(roundId).lean();
     if (!round) {
       return NextResponse.json({ error: "round not found" }, { status: 404 });
+    }
+
+    if (!canAccessRound(team, round)) {
+      return NextResponse.json(
+        { error: "you do not have access to this round" },
+        { status: 403 },
+      );
+    }
+
+    if (!round.is_active) {
+      return NextResponse.json(
+        { error: "round is locked. submissions are not allowed yet" },
+        { status: 403 },
+      );
     }
 
     // Check if submission deadline has passed (skip check if no end_time set)
@@ -163,6 +231,23 @@ async function GETHandler(
     return NextResponse.json({ error: "no team" }, { status: 400 });
 
   try {
+    const team = await Team.findById(user.team_id).lean();
+    if (!team) {
+      return NextResponse.json({ error: "team not found" }, { status: 404 });
+    }
+
+    const round = await Round.findById(roundId).lean();
+    if (!round) {
+      return NextResponse.json({ error: "round not found" }, { status: 404 });
+    }
+
+    if (!canAccessRound(team, round)) {
+      return NextResponse.json(
+        { error: "you do not have access to this round" },
+        { status: 403 },
+      );
+    }
+
     // Find submission for this specific round
     const submission = await Submission.findOne({
       team_id: user.team_id,

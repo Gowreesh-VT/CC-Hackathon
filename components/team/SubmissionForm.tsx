@@ -34,6 +34,30 @@ type Props = {
   onCancel?: () => void;
 };
 
+function extractErrorMessage(error: any): string {
+  const apiError = error?.data?.error;
+  if (!apiError) return "Unknown error";
+
+  if (typeof apiError === "string") return apiError;
+
+  if (Array.isArray(apiError)) {
+    return apiError.filter(Boolean).join(", ");
+  }
+
+  if (typeof apiError === "object") {
+    const messages = Object.values(apiError)
+      .flatMap((value: any) => (Array.isArray(value) ? value : [value]))
+      .filter(Boolean)
+      .map((value) => String(value));
+
+    if (messages.length > 0) {
+      return messages.join(", ");
+    }
+  }
+
+  return "Unknown error";
+}
+
 export default function SubmissionForm({
   subtask,
   onFinalSubmitted,
@@ -94,7 +118,7 @@ export default function SubmissionForm({
       }
     } catch (e: any) {
       console.error(e);
-      toast.error("Submission failed: " + (e?.data?.error || "Unknown error"));
+      toast.error("Submission failed: " + extractErrorMessage(e));
     }
   }
 

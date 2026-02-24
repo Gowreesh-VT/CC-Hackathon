@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import CountDown from "../../components/team/Countdown";
 import Link from "next/link";
 import { useGetTeamDashboardQuery } from "@/lib/redux/api/teamApi";
@@ -13,27 +13,27 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Trophy,
   Timer,
 } from "lucide-react";
 import { cn, ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function TeamDashboardPage() {
+  const [mounted, setMounted] = useState(false);
   const { data: dashboardData, isLoading } = useGetTeamDashboardQuery();
 
   useEffect(() => {
     setBreadcrumbs([]);
+    setMounted(true);
   }, []);
 
-  const loading = isLoading || !dashboardData;
+  const loading = !mounted || isLoading || !dashboardData;
 
   const teamName = dashboardData?.team_name ?? "—";
   const track = dashboardData?.track ?? "—";
   const activeRound = dashboardData?.current_round;
   const currentRoundSubtask = dashboardData?.current_round_subtask;
   const currentRoundSubmission = dashboardData?.current_round_submission;
-  const totalScore = dashboardData?.total_score ?? 0;
-  const latestRoundScore = dashboardData?.latest_round_score;
+  const currentRoundRemarks = dashboardData?.current_round_remarks ?? [];
 
   const startTime = activeRound?.start_time ?? null;
   const endTime = activeRound?.end_time ?? null;
@@ -157,7 +157,8 @@ export default function TeamDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Total Score */}
+        {/* Total Score (hidden for teams) */}
+        {/*
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">
@@ -180,6 +181,7 @@ export default function TeamDashboardPage() {
             )}
           </CardContent>
         </Card>
+        */}
       </div>
 
       {/* Current Round Subtask */}
@@ -262,7 +264,50 @@ export default function TeamDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* All Round Scores */}
+      {/* Current Round Remarks */}
+      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-600" />
+            Current Round Remarks
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : !activeRound ? (
+            <p className="text-sm text-muted-foreground">
+              No active round right now.
+            </p>
+          ) : currentRoundRemarks.length > 0 ? (
+            <div className="space-y-3">
+              {currentRoundRemarks.map((entry: any, idx: number) => (
+                <div key={idx} className="rounded-lg border p-4">
+                  <p className="text-sm font-medium">{entry.judge_name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {entry.remark}
+                  </p>
+                  {entry.updated_at && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Updated: {new Date(entry.updated_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No remarks yet for this round.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All Round Scores (hidden for teams) */}
+      {/*
       {dashboardData?.all_round_scores &&
         dashboardData.all_round_scores.length > 0 && (
           <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
@@ -307,6 +352,7 @@ export default function TeamDashboardPage() {
             </CardContent>
           </Card>
         )}
+      */}
     </div>
   );
 }
