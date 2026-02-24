@@ -9,6 +9,8 @@ import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import RoundOptions from "@/models/RoundOptions";
+import Track from "@/models/Track";
+import Subtask from "@/models/Subtask";
 import { proxy } from "@/lib/proxy";
 
 async function getJudgeFromSession() {
@@ -50,6 +52,8 @@ async function GETHandler(
       );
     }
   }
+  
+  const _forceInit = [Track.modelName, Subtask.modelName];
 
   // Verify round exists
   const round = await Round.findById(round_id);
@@ -117,19 +121,19 @@ async function GETHandler(
         track_id: (teamWithTrack?.track_id as any)?._id?.toString() || null,
         selected_subtask: selection?.selected
           ? {
-              id: (selection.selected as any)._id.toString(),
-              title: (selection.selected as any).title,
-              description: (selection.selected as any).description,
-            }
+            id: (selection.selected as any)._id.toString(),
+            title: (selection.selected as any).title,
+            description: (selection.selected as any).description,
+          }
           : null,
         submission: submission
           ? {
-              id: submission._id.toString(),
-              github_link: submission.github_link || null,
-              file_url: submission.file_url || null,
-              overview: submission.overview || null,
-              submitted_at: submission.submitted_at,
-            }
+            id: submission._id.toString(),
+            github_link: submission.github_link || null,
+            file_url: submission.file_url || null,
+            overview: submission.overview || null,
+            submitted_at: submission.submitted_at,
+          }
           : null,
         score: scoreData,
       };
