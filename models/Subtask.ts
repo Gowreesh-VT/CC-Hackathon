@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, models, model } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface ISubtask extends Document {
   title: string;
@@ -20,4 +20,5 @@ const SubtaskSchema = new Schema<ISubtask>({
   created_at: { type: Date, default: Date.now },
 });
 
-export default models.Subtask || model<ISubtask>("Subtask", SubtaskSchema);
+export default mongoose.models.Subtask ||
+  mongoose.model<ISubtask>("Subtask", SubtaskSchema);
