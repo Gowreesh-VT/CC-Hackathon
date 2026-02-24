@@ -84,6 +84,11 @@ export const subtaskSchema = z.object({
 export const teamSchema = z.object({
   team_name: z.string().min(2, "Team name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
+  mobile_number: z.string().min(7, "Mobile number is required"),
+  team_size: z.coerce
+    .number()
+    .int()
+    .min(1, "Team size must be at least 1"),
   track_id: z.string().min(1, "Track ID is required"),
 });
 
@@ -92,6 +97,11 @@ export const batchTeamSchema = z.object({
     z.object({
       team_name: z.string().min(2, "Team name must be at least 2 characters"),
       email: z.string().email("Invalid email address"),
+      mobile_number: z.string().min(7, "Mobile number is required"),
+      team_size: z.coerce
+        .number()
+        .int()
+        .min(1, "Team size must be at least 1"),
       track_id: z.string().min(1, "Track ID is required"),
     })
   ).min(1, "At least one team is required"),

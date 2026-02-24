@@ -9,6 +9,8 @@ export type Team = {
   id: string;
   team_name: string;
   email?: string;
+  mobile_number?: string;
+  team_size?: number;
   track?: string | null;
   track_id?: string | null;
   cumulative_score?: number | null;
@@ -76,6 +78,8 @@ export type TeamDetail = {
   id: string;
   team_name: string;
   email?: string;
+  mobile_number?: string;
+  team_size?: number;
   track: string | null;
   track_id?: string | null;
   cumulative_score: number;
@@ -98,6 +102,8 @@ export type RoundTeam = {
   track: string;
   track_id: string | null;
   score: number | null;
+  previous_round_score?: number | null;
+  previous_round_number?: number | null;
   allowed: boolean;
   submission: {
     id: string;
@@ -115,6 +121,8 @@ export type RoundTeam = {
 export type RoundTeamsResponse = {
   teams_by_track: Record<string, RoundTeam[]>;
   total_teams: number;
+  current_round_number?: number | null;
+  previous_round_number?: number | null;
 };
 
 export type JudgeAssignment = {

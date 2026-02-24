@@ -308,7 +308,11 @@ export default function RoundDetailsPage() {
     ? Object.fromEntries(
         Object.entries(roundTeamsData.teams_by_track).map(([track, teams]) => [
           track,
-          [...teams].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)),
+          [...teams].sort((a, b) => {
+            const aSortScore = a.previous_round_score ?? a.score ?? -1;
+            const bSortScore = b.previous_round_score ?? b.score ?? -1;
+            return bSortScore - aSortScore;
+          }),
         ]),
       )
     : {};
@@ -603,7 +607,7 @@ export default function RoundDetailsPage() {
                               {team.subtask_history?.selected?.title ?? <span className="italic">Not chosen yet</span>}
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-col gap-2 min-w-[200px]">
+                              <div className="grid grid-cols-2 gap-2 min-w-[380px]">
                                 <Select
                                   value={subtaskAssignments[team.id]?.slot1 ?? ""}
                                   onValueChange={(val) =>
@@ -699,6 +703,11 @@ export default function RoundDetailsPage() {
                           />
                         </TableHead>
                         <TableHead className="font-semibold">Team</TableHead>
+                        {roundTeamsData?.previous_round_number ? (
+                          <TableHead className="font-semibold text-right">
+                            Round {roundTeamsData.previous_round_number} Score
+                          </TableHead>
+                        ) : null}
                         <TableHead className="font-semibold text-right">Score</TableHead>
                         <TableHead className="font-semibold">Submission</TableHead>
                         <TableHead className="font-semibold">Subtask</TableHead>
@@ -715,6 +724,18 @@ export default function RoundDetailsPage() {
                             <Checkbox checked={allowedTeamIds.has(team.id)} onCheckedChange={() => handleToggleTeamAllowed(team.id)} />
                           </TableCell>
                           <TableCell className="font-medium">{team.team_name}</TableCell>
+                          {roundTeamsData?.previous_round_number ? (
+                            <TableCell className="text-right font-semibold">
+                              {team.previous_round_score !== null &&
+                              team.previous_round_score !== undefined ? (
+                                <span className="text-primary">
+                                  {team.previous_round_score}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          ) : null}
                           <TableCell className="text-right font-semibold">
                             {team.score !== null ? <span className="text-primary">{team.score}</span> : <span className="text-muted-foreground">—</span>}
                           </TableCell>

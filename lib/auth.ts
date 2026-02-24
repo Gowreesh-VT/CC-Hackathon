@@ -36,7 +36,6 @@ export const authOptions: NextAuthOptions = {
 
       await connectDB();
       const dbUser = await User.findOne({ email: user.email });
-      console.log("DB User:", dbUser);
 
       if (!dbUser) {
         return "/login?error=user-not-found";

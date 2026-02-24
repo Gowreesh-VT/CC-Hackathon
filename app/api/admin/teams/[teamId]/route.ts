@@ -15,6 +15,8 @@ export const dynamic = "force-dynamic";
 const updateTeamSchema = z.object({
   team_name: z.string().min(2).optional(),
   email: z.string().email().optional(),
+  mobile_number: z.string().min(7).optional(),
+  team_size: z.coerce.number().int().min(1).optional(),
   track_id: z.string().min(1).optional(),
 });
 
@@ -103,6 +105,8 @@ async function GETHandler(
       id: team._id.toString(),
       team_name: team.team_name,
       email: (team.user_id as any)?.email || "N/A",
+      mobile_number: team.mobile_number || "",
+      team_size: team.team_size ?? null,
       track: (team.track_id as any)?.name || "N/A",
       track_id: (team.track_id as any)?._id?.toString() || null,
       cumulative_score: cumulativeScore,
@@ -143,7 +147,8 @@ async function PATCHHandler(
       );
     }
 
-    const { team_name, email, track_id } = validation.data;
+    const { team_name, email, mobile_number, team_size, track_id } =
+      validation.data;
 
     const team = await Team.findById(teamId);
     if (!team) {
@@ -173,6 +178,14 @@ async function PATCHHandler(
         return NextResponse.json({ error: "Track not found" }, { status: 404 });
       }
       team.track_id = track_id as any;
+    }
+
+    if (mobile_number !== undefined) {
+      team.mobile_number = mobile_number;
+    }
+
+    if (team_size !== undefined) {
+      team.team_size = team_size;
     }
 
     // Update user email if provided
@@ -206,6 +219,8 @@ async function PATCHHandler(
         id: updatedTeam._id.toString(),
         team_name: updatedTeam.team_name,
         email: (updatedTeam.user_id as any)?.email || "N/A",
+        mobile_number: updatedTeam.mobile_number || "",
+        team_size: updatedTeam.team_size ?? null,
         track: (updatedTeam.track_id as any)?.name || "N/A",
         track_id: (updatedTeam.track_id as any)?._id?.toString() || null,
       },

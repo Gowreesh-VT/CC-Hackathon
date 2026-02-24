@@ -34,6 +34,11 @@ export const navConfig: Record<Role, SidebarNavItem[]> = {
       icon: Users,
     },
     {
+      title: "Leaderboard",
+      href: "/admin/leaderboard",
+      icon: Trophy,
+    },
+    {
       title: "Judges",
       href: "/admin/judges",
       icon: Gavel,

@@ -63,6 +63,8 @@ async function GETHandler(req: NextRequest) {
           id: team._id.toString(),
           team_name: team.team_name,
           email: team.user_id?.email || "N/A",
+          mobile_number: team.mobile_number || "",
+          team_size: team.team_size ?? null,
           track: team.track_id?.name || "N/A",
           track_id: team.track_id?._id?.toString() || null,
           rounds_accessible: (team.rounds_accessible || []).map((r: any) => ({
@@ -106,7 +108,8 @@ async function POSTHandler(request: NextRequest) {
       );
     }
 
-    const { team_name, email, track_id } = validation.data;
+    const { team_name, email, mobile_number, team_size, track_id } =
+      validation.data;
 
     // Verify track exists
     const track = await Track.findById(track_id);
@@ -154,6 +157,8 @@ async function POSTHandler(request: NextRequest) {
     const newTeam = await Team.create({
       user_id: user._id,
       team_name,
+      mobile_number,
+      team_size,
       track_id,
     });
 
@@ -173,6 +178,8 @@ async function POSTHandler(request: NextRequest) {
           id: populatedTeam._id.toString(),
           team_name: populatedTeam.team_name,
           email: (populatedTeam.user_id as any)?.email,
+          mobile_number: populatedTeam.mobile_number || "",
+          team_size: populatedTeam.team_size ?? null,
           track: (populatedTeam.track_id as any)?.name,
           track_id: (populatedTeam.track_id as any)?._id?.toString(),
         },

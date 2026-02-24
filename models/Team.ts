@@ -36,6 +36,8 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface ITeam extends Document {
   user_id: mongoose.Types.ObjectId;
   team_name: string;
+  mobile_number: string;
+  team_size: number;
   track_id: mongoose.Types.ObjectId;
   rounds_accessible: mongoose.Types.ObjectId[];
   created_at: Date;
@@ -48,12 +50,23 @@ const TeamSchema = new Schema<ITeam>({
     required: true,
   },
 
-  team_name: {
-    type: String,
-    required: true,
-    unique: true,
+  team_name: { 
+    type: String, 
+    required: true, 
+    unique: true 
   },
 
+  mobile_number: { 
+    type: String, 
+    default: "" 
+  },
+
+  team_size: { 
+    type: Number, 
+    min: 1, 
+    default: 1 
+  },
+  
   track_id: {
     type: Schema.Types.ObjectId,
     ref: "Track",

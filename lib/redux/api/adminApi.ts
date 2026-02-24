@@ -153,7 +153,13 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     createTeam: builder.mutation<
       any,
-      { team_name: string; email: string; track_id: string }
+      {
+        team_name: string;
+        email: string;
+        mobile_number: string;
+        team_size: number;
+        track_id: string;
+      }
     >({
       query: (body) => ({
         url: "/admin/teams",
@@ -164,7 +170,15 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     batchCreateTeams: builder.mutation<
       any,
-      { teams: Array<{ team_name: string; email: string; track_id: string }> }
+      {
+        teams: Array<{
+          team_name: string;
+          email: string;
+          mobile_number: string;
+          team_size: number;
+          track_id: string;
+        }>;
+      }
     >({
       query: (body) => ({
         url: "/admin/teams/batch",
@@ -175,7 +189,16 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     updateTeamStatus: builder.mutation<
       any,
-      { id: string; updates: Partial<{ team_name: string; email: string; track_id: string }> }
+      {
+        id: string;
+        updates: Partial<{
+          team_name: string;
+          email: string;
+          mobile_number: string;
+          team_size: number;
+          track_id: string;
+        }>;
+      }
     >({
       query: ({ id, updates }) => ({
         url: `/admin/teams/${id}`,

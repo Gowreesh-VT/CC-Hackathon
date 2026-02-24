@@ -5,15 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowLeft,
-  ExternalLink,
-  Github,
-  FileText,
-  Lock,
-  UserX,
-  AlertTriangle,
-} from "lucide-react";
+import { ArrowLeft, Github, FileText, Mail, Phone, Users } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -92,6 +84,37 @@ export default function TeamDetailsPage() {
       </header>
 
       <div className="grid gap-6">
+        <Card
+          className={cn(
+            "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
+            "dark:border-white/10 dark:bg-card/80",
+          )}
+        >
+          <CardHeader>
+            <CardTitle>Contact Details</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/60 p-4">
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Mail className="size-3.5" /> Email
+              </p>
+              <p className="mt-1 font-medium break-all">{team.email || "—"}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 p-4">
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Phone className="size-3.5" /> Mobile Number
+              </p>
+              <p className="mt-1 font-medium">{team.mobile_number || "—"}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 p-4">
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Users className="size-3.5" /> Team Size
+              </p>
+              <p className="mt-1 font-medium">{team.team_size ?? "—"}</p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card
           className={cn(
             "overflow-hidden border-white/10 bg-card/80 shadow-lg backdrop-blur-sm",
