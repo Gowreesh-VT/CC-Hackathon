@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 const MONGO_URI = process.env.MONGODB_URI as string;
 
 // CSV file path
-const CSV_FILE = path.join(__dirname, "participants.csv");
+const CSV_FILE = path.join(__dirname, "participants_2.csv");
 
 // connect to MongoDB
 async function connectDB() {
