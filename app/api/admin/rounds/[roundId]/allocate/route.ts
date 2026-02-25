@@ -31,19 +31,39 @@ async function POSTHandler(
     }
 
     await Promise.all(
-      allocations.map(({ teamId, subtaskIds }) =>
-        RoundOptions.findOneAndUpdate(
-          { team_id: teamId, round_id: roundId },
-          {
+      allocations.map(async ({ teamId, subtaskIds }) => {
+        const normalizedOptions = [...new Set(subtaskIds)].slice(0, 2);
+        const existing = await RoundOptions.findOne({
+          team_id: teamId,
+          round_id: roundId,
+        })
+          .select("selected")
+          .lean();
+
+        const previouslySelectedId = existing?.selected?.toString();
+        const keepPreviousSelection =
+          previouslySelectedId &&
+          normalizedOptions.includes(previouslySelectedId);
+
+        const update: any = {
+          $set: {
             team_id: teamId,
             round_id: roundId,
-            options: subtaskIds,
-            selected: null,
-            selected_at: null,
+            options: normalizedOptions,
           },
+        };
+
+        if (!keepPreviousSelection) {
+          update.$set.selected = null;
+          update.$set.selected_at = null;
+        }
+
+        return RoundOptions.findOneAndUpdate(
+          { team_id: teamId, round_id: roundId },
+          update,
           { upsert: true, new: true },
-        ),
-      ),
+        );
+      }),
     );
 
     return NextResponse.json({
