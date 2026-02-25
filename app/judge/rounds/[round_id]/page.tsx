@@ -169,6 +169,10 @@ export default function JudgeRoundDetailsPage() {
   const scored = evaluations.filter((e) => e.status === "scored").length;
 
   const selectedTeam = evaluations.find((e) => e.teamId === selectedTeamId);
+  const overviewText = selectedTeam?.submission?.overview?.trim() || "";
+  const overviewLinks: string[] = Array.from(
+    new Set<string>(overviewText.match(/https?:\/\/[^\s)]+/gi) || []),
+  );
 
   return (
     <div className="space-y-8">
@@ -292,97 +296,134 @@ export default function JudgeRoundDetailsPage() {
 
       {/* Evaluation Dialog */}
       <Dialog open={!!selectedTeamId} onOpenChange={() => setSelectedTeamId(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="!w-[88vw] lg:!w-[1000px] !max-w-[88vw] lg:!max-w-[1000px] flex max-h-[82vh] flex-col overflow-hidden rounded-2xl border bg-background p-0 shadow-xl">
           <DialogHeader>
-            <DialogTitle>
-              Evaluate {selectedTeam?.teamName}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submission</p>
-            {selectedTeam?.submission ? (
-              <div className="space-y-2">
-                {selectedTeam.submission.github_link && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-20 shrink-0">GitHub</span>
-                    <a
-                      href={ensureAbsoluteUrl(selectedTeam.submission.github_link)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-primary hover:underline truncate"
-                    >
-                      {selectedTeam.submission.github_link}
-                    </a>
-                  </div>
-                )}
-                {selectedTeam.submission.file_url && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-20 shrink-0">Drive / File</span>
-                    <a
-                      href={ensureAbsoluteUrl(selectedTeam.submission.file_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-primary hover:underline truncate"
-                    >
-                      {selectedTeam.submission.file_url}
-                    </a>
-                  </div>
-                )}
-                {selectedTeam.submission.overview && (
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Overview / Comments</span>
-                    <p className="text-sm whitespace-pre-wrap bg-background rounded p-2 border">
-                      {selectedTeam.submission.overview}
-                    </p>
-                  </div>
-                )}
-                {!selectedTeam.submission.github_link && !selectedTeam.submission.file_url && !selectedTeam.submission.overview && (
-                  <p className="text-sm text-muted-foreground italic">No submission details provided.</p>
+            <div className="border-b bg-background px-6 py-5">
+              <DialogTitle className="text-xl">
+                Evaluate {selectedTeam?.teamName}
+              </DialogTitle>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  Task: {selectedTeam?.taskName || "No task"}
+                </Badge>
+                <Badge
+                  variant={selectedTeam?.status === "scored" ? "default" : "secondary"}
+                  className="text-xs"
+                >
+                  {selectedTeam?.status === "scored" ? "Scored" : "Pending"}
+                </Badge>
+                {selectedTeam?.score !== null && (
+                  <Badge variant="outline" className="text-xs">
+                    Current: {selectedTeam?.score}/100
+                  </Badge>
                 )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Team has not submitted yet — you can still record a score.</p>
-            )}
-          </div>
+            </div>
+          </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Score <span className="text-red-500">*</span>
-                <span className="text-xs text-muted-foreground ml-2">
-                  (0-100)
-                </span>
-              </label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={dialogScore}
-                onChange={(e) => handleScoreChange(e.target.value)}
-                placeholder="Enter score"
-                className="w-full"
-              />
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Submission
+              </p>
+              {selectedTeam?.submission ? (
+                <div className="mt-3 space-y-3">
+                  {selectedTeam.submission.github_link && (
+                    <div className="rounded-lg border bg-background px-4 py-3">
+                      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        GitHub
+                      </p>
+                      <a
+                        href={ensureAbsoluteUrl(selectedTeam.submission.github_link)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-md px-0 py-0 text-sm font-medium text-primary hover:underline"
+                      >
+                        GitHub -&gt;
+                      </a>
+                    </div>
+                  )}
+                  {selectedTeam.submission.file_url && (
+                    <div className="rounded-lg border bg-background px-4 py-3">
+                      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Drive / File
+                      </p>
+                      <a
+                        href={ensureAbsoluteUrl(selectedTeam.submission.file_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-md px-0 py-0 text-sm font-medium text-primary hover:underline"
+                      >
+                        Drive / File -&gt;
+                      </a>
+                    </div>
+                  )}
+                  <div className="rounded-lg border bg-background px-4 py-3">
+                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Overview / Comments
+                    </p>
+                    <div className="max-h-24 overflow-y-auto rounded-md border bg-muted/20 p-2">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/90">
+                        {overviewText || "No overview provided."}
+                      </p>
+                    </div>
+                    {overviewLinks.length > 0 && (
+                      <div className="mt-2 max-h-20 space-y-1 overflow-y-auto pr-1">
+                        {overviewLinks.map((link, idx) => (
+                          <a
+                            key={`${link}-${idx}`}
+                            href={ensureAbsoluteUrl(link)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block truncate text-sm font-medium text-primary hover:underline"
+                          >
+                            Open link {idx + 1} -&gt;
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm italic text-muted-foreground">
+                  Team has not submitted yet. You can still record a score.
+                </p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Remarks{" "}
-                <span className="text-xs text-muted-foreground ml-2">
-                  (optional)
-                </span>
-              </label>
-              <Textarea
-                value={dialogRemarks}
-                onChange={(e) => setDialogRemarks(e.target.value)}
-                placeholder="Add feedback for the team..."
-                rows={6}
-                className="resize-none"
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Score <span className="text-red-500">*</span>
+                  <span className="ml-2 text-xs text-muted-foreground">(0-100)</span>
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={dialogScore}
+                  onChange={(e) => handleScoreChange(e.target.value)}
+                  placeholder="Enter score"
+                  className="h-11 w-full text-base"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Remarks <span className="ml-2 text-xs text-muted-foreground">(optional)</span>
+                </label>
+                <Textarea
+                  value={dialogRemarks}
+                  onChange={(e) => setDialogRemarks(e.target.value)}
+                  placeholder="Add feedback for the team..."
+                  rows={4}
+                  className="w-full resize-none"
+                />
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4 sm:justify-end">
             <Button variant="outline" onClick={() => setSelectedTeamId(null)}>
               Cancel
             </Button>

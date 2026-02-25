@@ -3,6 +3,7 @@ import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import User from "@/models/User";
 import Track from "@/models/Track";
+import "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import { teamSchema } from "@/lib/validations";
