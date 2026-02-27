@@ -1,6 +1,8 @@
 import { NextResponse, NextRequest } from "next/server";
 import { connectDB } from "@/config/db";
 import RoundOptions from "@/models/RoundOptions";
+import Round from "@/models/Round";
+import { isRound2 } from "@/lib/roundPolicy";
 import { proxy } from "@/lib/proxy";
 
 /**
@@ -19,6 +21,18 @@ async function POSTHandler(
   const { roundId } = await params;
 
   try {
+    const round = await Round.findById(roundId).select("round_number").lean();
+    if (!round) {
+      return NextResponse.json({ error: "Round not found" }, { status: 404 });
+    }
+    const roundNumber = (round as any).round_number;
+    if (!(roundNumber === 1 || isRound2(roundNumber))) {
+      return NextResponse.json(
+        { error: "Team-level allocation is available only for Rounds 1 and 2" },
+        { status: 400 },
+      );
+    }
+
     const body = await request.json();
     const allocations: { teamId: string; subtaskIds: string[] }[] =
       body.allocations || [];
@@ -50,6 +64,13 @@ async function POSTHandler(
             team_id: teamId,
             round_id: roundId,
             options: normalizedOptions,
+            // Reset pairing state — ensures stale pair fields don't persist
+            assignment_mode: "team",
+            pair_id: null,
+            priority_team_id: null,
+            paired_team_id: null,
+            published_at: null,
+            auto_assigned: false,
           },
         };
 
