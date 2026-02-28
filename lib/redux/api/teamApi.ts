@@ -4,10 +4,6 @@ import { PairSubmissionsResponse, TeamRoundDetails } from "./types";
 export const teamApi = baseApi.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
-    getTeamProfile: builder.query<any, void>({
-      query: () => "/team",
-      providesTags: ["Team"],
-    }),
     getTeamDashboard: builder.query<any, void>({
       query: () => "/team",
       providesTags: ["Team", "Round", "Submission"],
@@ -98,7 +94,6 @@ export const teamApi = baseApi.injectEndpoints({
 });
 
 export const {
-  useGetTeamProfileQuery,
   useGetTeamDashboardQuery,
   useGetTeamRoundsQuery,
   useGetTeamRoundDetailsQuery,

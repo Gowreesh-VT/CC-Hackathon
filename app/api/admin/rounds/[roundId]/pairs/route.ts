@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import Pairing from "@/models/Pairing";
 import Round from "@/models/Round";
 import Team from "@/models/Team";
-import RoundOptions from "@/models/RoundOptions";
 import { isRound2 } from "@/lib/roundPolicy";
 import { proxy } from "@/lib/proxy";
 
@@ -205,71 +204,6 @@ async function POSTHandler(
   }
 }
 
-/**
- * DELETE /api/admin/rounds/[roundId]/pairs
- * Body: { pairId: string }
- *
- * Deletes a pair and resets both teams' RoundOptions to a clean state.
- */
-async function DELETEHandler(
-  req: NextRequest,
-  context: { params: Promise<{ roundId: string }> },
-) {
-  await connectDB();
-  const { roundId } = await context.params;
-
-  if (!mongoose.isValidObjectId(roundId)) return invalidIdResponse("roundId");
-
-  const { pairId } = await req.json().catch(() => ({}));
-  if (!pairId) {
-    return NextResponse.json({ error: "pairId is required in the request body" }, { status: 400 });
-  }
-  if (!mongoose.isValidObjectId(pairId)) return invalidIdResponse("pairId");
-
-  const round = await Round.findById(roundId).select("round_number").lean();
-  if (!round) {
-    return NextResponse.json({ error: "Round not found" }, { status: 404 });
-  }
-  if (!isRound2((round as any).round_number)) {
-    return NextResponse.json(
-      { error: "Pair deletion is only available for Round 2" },
-      { status: 400 },
-    );
-  }
-
-  const pair = await Pairing.findOne({ _id: pairId, round_anchor_id: roundId }).lean();
-  if (!pair) {
-    return NextResponse.json({ error: "Pair not found" }, { status: 404 });
-  }
-
-  await Pairing.deleteOne({ _id: pairId });
-
-  // Cascade: reset RoundOptions for both teams so no stale pair state remains
-  await RoundOptions.updateMany(
-    {
-      round_id: roundId,
-      team_id: { $in: [pair.team_a_id, pair.team_b_id] },
-    },
-    {
-      $set: {
-        assignment_mode: "team",
-        pair_id: null,
-        priority_team_id: null,
-        paired_team_id: null,
-        published_at: null,
-        auto_assigned: false,
-        selected: null,
-        selected_at: null,
-        options: [],
-      },
-    },
-  );
-
-  return NextResponse.json({
-    message: "Pair deleted and team options reset successfully",
-  });
-}
-
 export const GET = proxy(GETHandler, ["admin"]);
 export const POST = proxy(POSTHandler, ["admin"]);
-export const DELETE = proxy(DELETEHandler, ["admin"]);
+// DELETE is handled by the nested [pairId] route: DELETE /admin/rounds/[roundId]/pairs/[pairId]
