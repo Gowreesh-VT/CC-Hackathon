@@ -13,6 +13,7 @@ const JudgeSchema = new Schema<IJudge>({
     type: Schema.Types.ObjectId,
     ref: "User",
     required: true,
+    unique: true, // One user account can only be one judge
   },
   judge_name: { type: String, required: true },
   track_id: {
