@@ -135,6 +135,10 @@ export default function JudgeRoundDetailsPage() {
 
   const handleSaveEvaluation = async () => {
     if (!selectedTeamId) return;
+    if (!selectedTeam?.submission) {
+      toast.error("Cannot score: team has not submitted for this round");
+      return;
+    }
     if (!isRound4 && dialogScore === "") {
       toast.error("Score is required");
       return;
@@ -197,8 +201,14 @@ export default function JudgeRoundDetailsPage() {
 
       toast.success("Evaluation saved");
       setSelectedTeamId(null);
-    } catch {
-      toast.error("Failed to save evaluation");
+    } catch (error: any) {
+      const apiError =
+        error?.data?.error ||
+        error?.error ||
+        "Failed to save evaluation";
+      toast.error(
+        Array.isArray(apiError) ? apiError.join(", ") : String(apiError),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -459,7 +469,7 @@ export default function JudgeRoundDetailsPage() {
                 </div>
               ) : (
                 <p className="mt-2 text-sm italic text-muted-foreground">
-                  Team has not submitted yet. You can still record a score.
+                  Team has not submitted yet. Scoring is available only after submission.
                 </p>
               )}
             </div>
@@ -543,7 +553,7 @@ export default function JudgeRoundDetailsPage() {
             <Button variant="outline" onClick={() => setSelectedTeamId(null)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEvaluation} disabled={isSaving}>
+            <Button onClick={handleSaveEvaluation} disabled={isSaving || !selectedTeam?.submission}>
               {isSaving && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}

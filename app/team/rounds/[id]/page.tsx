@@ -149,55 +149,27 @@ export default function Page() {
             {allTrackSubtasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">No subtasks available for your track.</p>
             ) : (
-              <div className="max-h-64 space-y-2 overflow-y-auto">
+              <div className="grid gap-4 md:grid-cols-2">
                 {allTrackSubtasks.map((task: any) => (
-                  <div key={task._id} className="rounded-lg border p-3">
-                    <p className="font-medium">{task.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Pair Submissions (Rounds 1-3)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!isRoundStarted ? (
-              <p className="text-sm text-muted-foreground">
-                Pair submissions will be visible once Round 4 starts.
-              </p>
-            ) : pairSubmissionHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pair submission history available.</p>
-            ) : (
-              <div className="max-h-72 space-y-2 overflow-y-auto">
-                {pairSubmissionHistory.map((item: any) => (
-                  <div key={item.id} className="rounded-lg border p-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {item.is_current_team ? "Your Team" : "Partner Team"} - Round {item.round_number ?? "-"}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {item.submitted_at ? new Date(item.submitted_at).toLocaleString() : "-"}
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {item.github_link && (
-                        <a href={ensureAbsoluteUrl(item.github_link)} target="_blank" className="block text-primary hover:underline">
-                          GitHub Link
-                        </a>
+                  <Card
+                    key={task._id}
+                    className="border-2 border-border transition hover:border-primary/50"
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-base">{task.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm text-muted-foreground">{task.description}</p>
+                      {task.statement && (
+                        <div className="rounded-md border border-border bg-muted/30 p-3">
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">
+                            PROBLEM STATEMENT
+                          </p>
+                          <p className="line-clamp-4 text-sm">{task.statement}</p>
+                        </div>
                       )}
-                      {item.file_url && (
-                        <a href={ensureAbsoluteUrl(item.file_url)} target="_blank" className="block text-primary hover:underline">
-                          File Link
-                        </a>
-                      )}
-                      {item.overview && <p className="text-muted-foreground">{item.overview}</p>}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}

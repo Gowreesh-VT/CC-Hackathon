@@ -25,6 +25,9 @@ export default function TeamSubmissionsPage() {
         new Date(round4.start_time).getTime() <= new Date().getTime()));
   const { data: pairSubmissions = [], isLoading: pairLoading } =
     useGetPairSubmissionsQuery(undefined, { skip: !isRound4Started });
+  const partnerSubmissions = pairSubmissions.filter(
+    (sub: any) => !sub.is_current_team,
+  );
 
   useEffect(() => {
     setBreadcrumbs([{ label: "Submissions", href: "/team/submissions" }]);
@@ -221,7 +224,7 @@ export default function TeamSubmissionsPage() {
           <CardContent>
             {pairLoading ? (
               <p className="text-sm text-muted-foreground">Loading pair submissions...</p>
-            ) : pairSubmissions.length === 0 ? (
+            ) : partnerSubmissions.length === 0 ? (
               <p className="text-sm text-muted-foreground">No pair submissions available.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -236,7 +239,7 @@ export default function TeamSubmissionsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pairSubmissions.map((sub: any) => (
+                    {partnerSubmissions.map((sub: any) => (
                       <tr key={sub._id} className="border-b border-border transition hover:bg-muted/50">
                         <td className="px-6 py-4">{sub.team_name}</td>
                         <td className="px-6 py-4">Round {sub.round_number ?? "-"}</td>
@@ -266,7 +269,7 @@ export default function TeamSubmissionsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 max-w-xs truncate text-muted-foreground" title={sub.overview}>
-                          {sub.overview || "-"}
+                          {sub.overview || "No overview Available"}
                         </td>
                       </tr>
                     ))}
