@@ -175,6 +175,7 @@ async function GETHandler(
       const teamData = {
         id: teamId,
         team_name: team.team_name,
+        team_size: team.team_size ?? null,
         track: trackName,
         track_id: team.track_id?._id?.toString() || null,
         submission: submission

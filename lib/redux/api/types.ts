@@ -101,6 +101,7 @@ export type TeamDetail = {
 export type RoundTeam = {
   id: string;
   team_name: string;
+  team_size?: number | null;
   track: string;
   track_id: string | null;
   score: number | null;

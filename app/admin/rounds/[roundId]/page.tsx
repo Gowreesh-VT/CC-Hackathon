@@ -1161,6 +1161,7 @@ export default function RoundDetailsPage() {
                           />
                         </TableHead>
                         <TableHead className="font-semibold">Team</TableHead>
+                        <TableHead className="font-semibold text-right">Team Size</TableHead>
                         {roundTeamsData?.previous_round_number ? (
                           <TableHead className="font-semibold text-right">
                             Round {roundTeamsData.previous_round_number} Score
@@ -1182,6 +1183,9 @@ export default function RoundDetailsPage() {
                             <Checkbox checked={allowedTeamIds.has(team.id)} onCheckedChange={() => handleToggleTeamAllowed(team.id)} />
                           </TableCell>
                           <TableCell className="font-medium">{team.team_name}</TableCell>
+                          <TableCell className="text-right">
+                            {team.team_size ?? "—"}
+                          </TableCell>
                           {roundTeamsData?.previous_round_number ? (
                             <TableCell className="text-right font-semibold">
                               {team.previous_round_score !== null &&

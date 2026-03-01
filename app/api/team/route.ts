@@ -22,6 +22,7 @@ import Judge from "@/models/Judge";
 import "@/models/Track";
 import { proxy } from "@/lib/proxy";
 import { getEffectiveAccessibleRoundIds } from "@/lib/roundPolicy";
+import Pairing from "@/models/Pairing";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +143,30 @@ async function GETHandler(request: NextRequest) {
       }
     }
 
+    let pairInfo: { pair_id: string; pair_team_id: string; pair_team_name: string } | null = null;
+    const round2 = allRounds.find((r: any) => r.round_number === 2);
+    if (round2?._id) {
+      const pair = await Pairing.findOne({
+        round_anchor_id: round2._id,
+        $or: [{ team_a_id: teamId }, { team_b_id: teamId }],
+      })
+        .populate("team_a_id", "team_name")
+        .populate("team_b_id", "team_name")
+        .lean();
+
+      if (pair) {
+        const isTeamA = pair.team_a_id?._id?.toString() === teamId.toString();
+        const partnerTeam = isTeamA ? pair.team_b_id : pair.team_a_id;
+        if (partnerTeam?._id) {
+          pairInfo = {
+            pair_id: pair._id.toString(),
+            pair_team_id: partnerTeam._id.toString(),
+            pair_team_name: partnerTeam.team_name || "N/A",
+          };
+        }
+      }
+    }
+
     return NextResponse.json({
       team_name: team.team_name,
       track: (team.track_id as any)?.name || "N/A",
@@ -159,6 +184,7 @@ async function GETHandler(request: NextRequest) {
       current_round_subtask: currentRoundSubtask,
       current_round_submission: currentRoundSubmission,
       current_round_remarks: currentRoundRemarks,
+      pair_info: pairInfo,
       // total_score: totalScore,
       // latest_round_score: latestRoundScore,
       // all_round_scores: allRoundScores,

@@ -14,6 +14,7 @@ import {
   CheckCircle,
   AlertCircle,
   Timer,
+  Users,
 } from "lucide-react";
 import { cn, ensureAbsoluteUrl } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ export default function TeamDashboardPage() {
   const currentRoundSubtask = dashboardData?.current_round_subtask;
   const currentRoundSubmission = dashboardData?.current_round_submission;
   const currentRoundRemarks = dashboardData?.current_round_remarks ?? [];
+  const pairInfo = dashboardData?.pair_info ?? null;
 
   const startTime = activeRound?.start_time ?? null;
   const endTime = activeRound?.end_time ?? null;
@@ -158,6 +160,32 @@ export default function TeamDashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Pair Info */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium">
+              Your Pair
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {pairInfo?.pair_team_name || "—"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {pairInfo?.pair_team_name
+                    ? "Paired for Rounds 2-4"
+                    : "Pair not assigned yet"}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Total Score (hidden for teams) */}
         {/*
         <Card>
@@ -250,11 +278,13 @@ export default function TeamDashboardPage() {
                 </a>
               )}
               {activeRound?._id && (
-                <Link href={`/team/rounds/${activeRound._id}`}>
-                  <Button size="sm" variant="outline">
-                    Update Submission
-                  </Button>
-                </Link>
+                <div className="pt-1">
+                  <Link href={`/team/rounds/${activeRound._id}`}>
+                    <Button size="sm" variant="outline">
+                      Update Submission
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
           ) : (

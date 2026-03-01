@@ -81,9 +81,13 @@ async function GETHandler(req: NextRequest) {
             num_judges: round.num_judges,
           }));
 
-        // Calculate cumulative score
+
         const cumulativeScore = roundScores.reduce(
-          (sum, round) => sum + (round.score || 0),
+          (sum, round) =>
+            sum +
+            (round.score || 0) +
+            (round.sec_score || 0) +
+            (round.faculty_score || 0),
           0,
         );
 
