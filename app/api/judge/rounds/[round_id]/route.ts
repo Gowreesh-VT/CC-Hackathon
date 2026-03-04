@@ -11,6 +11,7 @@ import Score from "@/models/Score";
 import RoundOptions from "@/models/RoundOptions";
 import Track from "@/models/Track";
 import Subtask from "@/models/Subtask";
+import { isRound4 } from "@/lib/roundPolicy";
 import { proxy } from "@/lib/proxy";
 import { getAssignedTeamIdsForJudgeRound } from "@/lib/judgeAssignments";
 
@@ -110,7 +111,13 @@ async function GETHandler(
 
         if (scoreDoc) {
           scoreData = {
-            score: scoreDoc.score,
+            score: isRound4(round.round_number) ? null : scoreDoc.score,
+            sec_score: isRound4(round.round_number)
+              ? (scoreDoc.sec_score ?? null)
+              : null,
+            faculty_score: isRound4(round.round_number)
+              ? (scoreDoc.faculty_score ?? null)
+              : null,
             remarks: scoreDoc.remarks || "",
             status: scoreDoc.status || "pending",
             updated_at: scoreDoc.updated_at,

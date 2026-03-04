@@ -34,6 +34,19 @@ export const scoreSchema = z.object({
   status: z.enum(["pending", "scored"]).optional(),
 });
 
+export const round4ScoreSchema = z.object({
+  sec_score: z
+    .number()
+    .min(0, "SEC score must be at least 0")
+    .max(100, "SEC score cannot exceed 100"),
+  faculty_score: z
+    .number()
+    .min(0, "Faculty score must be at least 0")
+    .max(100, "Faculty score cannot exceed 100"),
+  remarks: z.string().optional(),
+  status: z.enum(["pending", "scored"]).optional(),
+});
+
 export const submissionSchema = z.object({
   roundId: z.string().min(1, "Round ID is required"),
   fileUrl: z

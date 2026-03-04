@@ -40,7 +40,9 @@ export const judgeApi = baseApi.injectEndpoints({
       {
         roundId: string;
         teamId: string;
-        score: number;
+        score?: number;
+        sec_score?: number;
+        faculty_score?: number;
         remarks?: string;
         status?: string;
       }
@@ -61,7 +63,9 @@ export const judgeApi = baseApi.injectEndpoints({
       {
         roundId: string;
         teamId: string;
-        score: number;
+        score?: number;
+        sec_score?: number;
+        faculty_score?: number;
         remarks?: string;
         status?: string;
       }

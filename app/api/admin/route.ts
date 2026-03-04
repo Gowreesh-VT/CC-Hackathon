@@ -46,21 +46,20 @@ async function GETHandler() {
 
       // 4. Pending Evaluations
       // Submissions that have no scores or pending scores
-      const allSubmissionsForRound = await Submission.find({
+      const submissionsForRound = await Submission.find({
         round_id: currentRound._id,
-      }).lean();
+      }).select("_id").lean();
 
-      const scoredSubmissionIds = await Score.distinct("submission_id", {
+      const submissionIdsForRound = submissionsForRound.map((s) => s._id);
+
+      // Scope scored IDs to only this round's submissions to avoid counting
+      // scores from other rounds.
+      const scoredInRoundCount = await Score.countDocuments({
+        submission_id: { $in: submissionIdsForRound },
         status: "scored",
       });
 
-      const scoredSubmissionIdsSet = new Set(
-        scoredSubmissionIds.map((id) => id.toString()),
-      );
-
-      pendingEvaluationCount = allSubmissionsForRound.filter(
-        (sub) => !scoredSubmissionIdsSet.has(sub._id.toString()),
-      ).length;
+      pendingEvaluationCount = submissionsForRound.length - scoredInRoundCount;
     }
 
     // 5. Get top 5 teams based on cumulative score across all rounds
@@ -103,10 +102,10 @@ async function GETHandler() {
       totalTeams,
       currentRound: currentRound
         ? {
-            id: currentRound._id,
-            name: `Round ${currentRound.round_number}`,
-            round_number: currentRound.round_number,
-          }
+          id: currentRound._id,
+          name: `Round ${currentRound.round_number}`,
+          round_number: currentRound.round_number,
+        }
         : null,
       roundStatus,
       submissionsCount,

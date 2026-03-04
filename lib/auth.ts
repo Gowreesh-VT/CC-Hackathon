@@ -1,27 +1,22 @@
 import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import User from "@/models/User";
+import { connectDB } from "@/config/db";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 if (!googleClientId || !googleClientSecret) {
-  console.warn(
-    "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Add them to your environment.",
+  throw new Error(
+    "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Add them to your .env.local file.",
   );
 }
-
-// Fallback to avoid build errors if env vars are missing
-const clientId = googleClientId || "dummy_client_id";
-const clientSecret = googleClientSecret || "dummy_client_secret";
-
-import User from "@/models/User";
-import { connectDB } from "@/config/db";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: clientId,
-      clientSecret: clientSecret,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     }),
   ],
   session: { strategy: "jwt" },
@@ -35,7 +30,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       await connectDB();
-      const dbUser = await User.findOne({ email: user.email });
+      const dbUser = await User.findOne({ email: user.email }).lean();
 
       if (!dbUser) {
         return "/login?error=user-not-found";
@@ -43,21 +38,20 @@ export const authOptions: NextAuthOptions = {
 
       return true;
     },
+    // Only query the DB on the first sign-in (when `user` is truthy).
+    // Subsequent requests use the data already cached in the JWT token,
+    // avoiding a DB round-trip on every authenticated API call.
     async jwt({ token, user }) {
       if (user) {
-        token.email = user.email;
-      }
-
-      if (token.email) {
+        // Initial sign-in: hydrate the token from the DB once.
         await connectDB();
-        const dbUser = await User.findOne({ email: token.email });
-
+        const dbUser = await User.findOne({ email: user.email }).lean();
         if (dbUser) {
-          token.role = dbUser.role;
-          token.team_id = dbUser.team_id?.toString();
+          token.email = user.email;
+          token.role = (dbUser as any).role;
+          token.team_id = (dbUser as any).team_id?.toString();
         }
       }
-
       return token;
     },
     async session({ session, token }) {

@@ -5,13 +5,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExternalLink } from "lucide-react";
-import { useGetTeamSubmissionsQuery } from "@/lib/redux/api/teamApi";
+import {
+  useGetPairSubmissionsQuery,
+  useGetTeamRoundsQuery,
+  useGetTeamSubmissionsQuery,
+} from "@/lib/redux/api/teamApi";
 import { setBreadcrumbs } from "@/lib/hooks/useBreadcrumb";
 import { ensureAbsoluteUrl } from "@/lib/utils";
 
 export default function TeamSubmissionsPage() {
   const { data: submissions = [], isLoading } =
     useGetTeamSubmissionsQuery();
+  const { data: rounds = [] } = useGetTeamRoundsQuery();
+  const round4 = rounds.find((r: any) => r.round_number === 4);
+  const isRound4Started =
+    !!round4 &&
+    (round4.is_active ||
+      (round4.start_time &&
+        new Date(round4.start_time).getTime() <= new Date().getTime()));
+  const { data: pairSubmissions = [], isLoading: pairLoading } =
+    useGetPairSubmissionsQuery(undefined, { skip: !isRound4Started });
+  const partnerSubmissions = pairSubmissions.filter(
+    (sub: any) => !sub.is_current_team,
+  );
 
   useEffect(() => {
     setBreadcrumbs([{ label: "Submissions", href: "/team/submissions" }]);
@@ -199,6 +215,71 @@ export default function TeamSubmissionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {isRound4Started && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pair Submissions (Rounds 1-3)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pairLoading ? (
+              <p className="text-sm text-muted-foreground">Loading pair submissions...</p>
+            ) : partnerSubmissions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No pair submissions available.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-6 py-3 text-left">Team</th>
+                      <th className="px-6 py-3 text-left">Round</th>
+                      <th className="px-6 py-3 text-left">Submitted At</th>
+                      <th className="px-6 py-3 text-left">Links</th>
+                      <th className="px-6 py-3 text-left">Overview</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partnerSubmissions.map((sub: any) => (
+                      <tr key={sub._id} className="border-b border-border transition hover:bg-muted/50">
+                        <td className="px-6 py-4">{sub.team_name}</td>
+                        <td className="px-6 py-4">Round {sub.round_number ?? "-"}</td>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : "-"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            {sub.github_link && (
+                              <a
+                                href={ensureAbsoluteUrl(sub.github_link)}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                GitHub <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                            {sub.file_url && (
+                              <a
+                                href={ensureAbsoluteUrl(sub.file_url)}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                Document <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 max-w-xs truncate text-muted-foreground" title={sub.overview}>
+                          {sub.overview || "No overview Available"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

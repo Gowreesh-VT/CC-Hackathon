@@ -30,33 +30,64 @@ async function GETHandler(req: NextRequest) {
           .populate("round_id", "round_number")
           .lean();
 
-        // Calculate scores per round
-        const roundScores = await Promise.all(
-          submissions.map(async (submission: any) => {
-            // Get all scores for this submission
-            const scores = await Score.find({
-              submission_id: submission._id,
-              status: "scored",
-            }).lean();
+        const roundScoreMap = new Map<
+          number,
+          {
+            round_id: string | null;
+            round_number: number;
+            score: number;
+            sec_score: number;
+            faculty_score: number;
+            num_judges: number;
+          }
+        >();
 
-            // Sum up all judge scores for this submission
-            const totalScore = scores.reduce(
-              (sum, scoreDoc) => sum + (scoreDoc.score || 0),
-              0,
-            );
+        for (const submission of submissions) {
+          const roundNumber = submission.round_id?.round_number;
+          if (!roundNumber) continue;
 
-            return {
-              round_id: submission.round_id?._id?.toString() || null,
-              round_number: submission.round_id?.round_number || null,
-              score: totalScore,
-              num_judges: scores.length,
-            };
-          }),
-        );
+          const scores = await Score.find({
+            submission_id: submission._id,
+            status: "scored",
+          }).lean();
 
-        // Calculate cumulative score
+          const current = roundScoreMap.get(roundNumber) || {
+            round_id: submission.round_id?._id?.toString() || null,
+            round_number: roundNumber,
+            score: 0,
+            sec_score: 0,
+            faculty_score: 0,
+            num_judges: 0,
+          };
+
+          for (const scoreDoc of scores as any[]) {
+            current.score += scoreDoc.score || 0;
+            current.sec_score += scoreDoc.sec_score || 0;
+            current.faculty_score += scoreDoc.faculty_score || 0;
+            current.num_judges += 1;
+          }
+
+          roundScoreMap.set(roundNumber, current);
+        }
+
+        const roundScores = Array.from(roundScoreMap.values())
+          .sort((a, b) => a.round_number - b.round_number)
+          .map((round) => ({
+            round_id: round.round_id,
+            round_number: round.round_number,
+            score: round.round_number === 4 ? null : round.score,
+            sec_score: round.round_number === 4 ? round.sec_score : null,
+            faculty_score: round.round_number === 4 ? round.faculty_score : null,
+            num_judges: round.num_judges,
+          }));
+
+
         const cumulativeScore = roundScores.reduce(
-          (sum, round) => sum + round.score,
+          (sum, round) =>
+            sum +
+            (round.score || 0) +
+            (round.sec_score || 0) +
+            (round.faculty_score || 0),
           0,
         );
 

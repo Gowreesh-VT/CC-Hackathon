@@ -10,18 +10,7 @@ import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
 import { submissionSchema } from "@/lib/validations";
 import { proxy } from "@/lib/proxy";
-
-function canAccessRound(team: any, round: any) {
-  const accessibleRoundIds = new Set(
-    (team.rounds_accessible || []).map((rid: any) => rid.toString()),
-  );
-
-  if (round.round_number === 1) {
-    return round.is_active || accessibleRoundIds.has(round._id.toString());
-  }
-
-  return accessibleRoundIds.has(round._id.toString());
-}
+import { canAccessRound } from "@/lib/roundPolicy";
 
 async function POSTHandler(
   req: NextRequest,
@@ -63,7 +52,13 @@ async function POSTHandler(
       return NextResponse.json({ error: "round not found" }, { status: 404 });
     }
 
-    if (!canAccessRound(team, round)) {
+    const roundAccessContext = await Round.find({
+      round_number: { $in: [2, 3, 4] },
+    })
+      .select("_id round_number")
+      .lean();
+
+    if (!canAccessRound(team, round as any, roundAccessContext as any[])) {
       return NextResponse.json(
         { error: "you do not have access to this round" },
         { status: 403 },
@@ -115,7 +110,11 @@ async function POSTHandler(
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Error creating submission:", err);
+    return NextResponse.json(
+      { error: "Failed to create submission" },
+      { status: 500 },
+    );
   }
 }
 
@@ -160,7 +159,13 @@ async function PATCHHandler(
       return NextResponse.json({ error: "round not found" }, { status: 404 });
     }
 
-    if (!canAccessRound(team, round)) {
+    const roundAccessContext = await Round.find({
+      round_number: { $in: [2, 3, 4] },
+    })
+      .select("_id round_number")
+      .lean();
+
+    if (!canAccessRound(team, round as any, roundAccessContext as any[])) {
       return NextResponse.json(
         { error: "you do not have access to this round" },
         { status: 403 },
@@ -208,7 +213,11 @@ async function PATCHHandler(
     const updatedDoc = await submission.save();
     return NextResponse.json({ ok: true, submission: updatedDoc });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Error updating submission:", err);
+    return NextResponse.json(
+      { error: "Failed to update submission" },
+      { status: 500 },
+    );
   }
 }
 
@@ -241,7 +250,13 @@ async function GETHandler(
       return NextResponse.json({ error: "round not found" }, { status: 404 });
     }
 
-    if (!canAccessRound(team, round)) {
+    const roundAccessContext = await Round.find({
+      round_number: { $in: [2, 3, 4] },
+    })
+      .select("_id round_number")
+      .lean();
+
+    if (!canAccessRound(team, round as any, roundAccessContext as any[])) {
       return NextResponse.json(
         { error: "you do not have access to this round" },
         { status: 403 },
@@ -276,17 +291,21 @@ async function GETHandler(
       score:
         scores.length > 0
           ? {
-              score: totalScore,
-              status: "scored",
-              remarks: scores[0]?.remarks || "",
-              num_judges: scores.length,
-            }
+            score: totalScore,
+            status: "scored",
+            remarks: scores[0]?.remarks || "",
+            num_judges: scores.length,
+          }
           : null,
     };
 
     return NextResponse.json(submissionWithScore);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Error fetching submission:", err);
+    return NextResponse.json(
+      { error: "Failed to fetch submission" },
+      { status: 500 },
+    );
   }
 }
 

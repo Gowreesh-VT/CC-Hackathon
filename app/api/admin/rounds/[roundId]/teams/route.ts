@@ -5,6 +5,9 @@ import Submission from "@/models/Submission";
 import Score from "@/models/Score";
 import RoundOptions from "@/models/RoundOptions";
 import Round from "@/models/Round";
+import Pairing from "@/models/Pairing";
+import { resolveRound3PairTimeout } from "@/lib/pairing";
+import { isRound2, isRound3, isRound4 } from "@/lib/roundPolicy";
 import { proxy } from "@/lib/proxy";
 
 // GET: Fetch teams for a round, grouped by track with subtask history
@@ -47,16 +50,33 @@ async function GETHandler(
       submissions.map((sub: any) => [sub.team_id.toString(), sub]),
     );
 
+    const isRound4View = isRound4(currentRoundNumber);
+
     // Get scores for submissions in this round
     const submissionIds = submissions.map((s: any) => s._id);
     const scores = await Score.find({
       submission_id: { $in: submissionIds },
       status: "scored",
-    }).lean();
+    })
+      .sort({ updated_at: -1 })
+      .lean();
     const scoreMap = new Map<string, number>();
+    const round4ScoreMap = new Map<
+      string,
+      { sec_score: number | null; faculty_score: number | null }
+    >();
     scores.forEach((score: any) => {
       const key = score.submission_id.toString();
-      scoreMap.set(key, (scoreMap.get(key) ?? 0) + (score.score ?? 0));
+      if (isRound4View) {
+        if (!round4ScoreMap.has(key)) {
+          round4ScoreMap.set(key, {
+            sec_score: score.sec_score ?? null,
+            faculty_score: score.faculty_score ?? null,
+          });
+        }
+      } else {
+        scoreMap.set(key, (scoreMap.get(key) ?? 0) + (score.score ?? 0));
+      }
     });
 
     // Get submissions and score totals for previous round (if available)
@@ -90,9 +110,50 @@ async function GETHandler(
       .populate("selected", "title")
       .populate("options", "title")
       .lean();
+
+    if (isRound3(currentRoundNumber)) {
+      await Promise.all(
+        roundOptions
+          .filter((opt: any) => opt.assignment_mode === "pair")
+          .map((opt: any) => resolveRound3PairTimeout(roundId, opt.team_id.toString())),
+      );
+    }
+
+    const refreshedRoundOptions = await RoundOptions.find({ round_id: roundId })
+      .populate("selected", "title")
+      .populate("options", "title")
+      .lean();
     const optionsMap = new Map(
-      roundOptions.map((opt: any) => [opt.team_id.toString(), opt]),
+      refreshedRoundOptions.map((opt: any) => [opt.team_id.toString(), opt]),
     );
+
+    const round2 = await Round.findOne({ round_number: 2 }).select("_id").lean();
+    const allowedRoundIdForFlag =
+      currentRoundNumber === 1 && round2?._id
+        ? (round2 as any)._id.toString()
+        : roundId;
+    const pairings = round2
+      ? await Pairing.find({ round_anchor_id: (round2 as any)._id })
+          .populate("team_a_id", "team_name")
+          .populate("team_b_id", "team_name")
+          .lean()
+      : [];
+    const pairByTeam = new Map<string, any>();
+    pairings.forEach((pair: any) => {
+      const teamAId = pair.team_a_id?._id?.toString();
+      const teamBId = pair.team_b_id?._id?.toString();
+      if (!teamAId || !teamBId) return;
+      pairByTeam.set(teamAId, {
+        pair_id: pair._id.toString(),
+        teammate_id: teamBId,
+        teammate_name: pair.team_b_id.team_name,
+      });
+      pairByTeam.set(teamBId, {
+        pair_id: pair._id.toString(),
+        teammate_id: teamAId,
+        teammate_name: pair.team_a_id.team_name,
+      });
+    });
 
     // Group teams by track
     const teamsByTrack: any = {};
@@ -102,6 +163,9 @@ async function GETHandler(
       const trackName = team.track_id?.name || "Unassigned";
       const submission = submissionMap.get(teamId);
       const score = submission ? scoreMap.get(submission._id.toString()) : null;
+      const round4Score = submission
+        ? round4ScoreMap.get(submission._id.toString())
+        : null;
       const previousSubmission = previousSubmissionMap.get(teamId);
       const previousScore = previousSubmission
         ? previousScoreMap.get(previousSubmission._id.toString())
@@ -111,6 +175,7 @@ async function GETHandler(
       const teamData = {
         id: teamId,
         team_name: team.team_name,
+        team_size: team.team_size ?? null,
         track: trackName,
         track_id: team.track_id?._id?.toString() || null,
         submission: submission
@@ -122,6 +187,8 @@ async function GETHandler(
             }
           : null,
         score: score ?? null,
+        sec_score: round4Score?.sec_score ?? null,
+        faculty_score: round4Score?.faculty_score ?? null,
         previous_round_score: previousScore ?? null,
         previous_round_number: previousRoundNumber,
         subtask_history: options
@@ -137,10 +204,23 @@ async function GETHandler(
                   }
                 : null,
               selected_at: options.selected_at,
+              assignment_mode: options.assignment_mode || "team",
+              priority_team_id: options.priority_team_id?.toString?.() || null,
+              paired_team_id: options.paired_team_id?.toString?.() || null,
+              auto_assigned: options.auto_assigned || false,
+            }
+          : null,
+        pair: pairByTeam.get(teamId) || null,
+        priority_meta: options
+          ? {
+              assignment_mode: options.assignment_mode || "team",
+              priority_team_id: options.priority_team_id?.toString?.() || null,
+              paired_team_id: options.paired_team_id?.toString?.() || null,
+              auto_assigned: options.auto_assigned || false,
             }
           : null,
         allowed: (team.rounds_accessible || []).some(
-          (r: any) => r.toString() === roundId,
+          (r: any) => r.toString() === allowedRoundIdForFlag,
         ),
       };
 
@@ -178,14 +258,111 @@ async function POSTHandler(
   try {
     const body = await request.json();
     const teamIds: string[] = body.teamIds || [];
+    const currentRound = await Round.findById(roundId).select("round_number").lean();
+    if (!currentRound) {
+      return NextResponse.json({ error: "Round not found" }, { status: 404 });
+    }
+    const currentRoundNumber = (currentRound as any).round_number;
+    const shouldControlRound234 =
+      currentRoundNumber === 1 || isRound2(currentRoundNumber);
 
-    // Add round to selected teams' accessible rounds
+    if (shouldControlRound234) {
+      const round2 = await Round.findOne({ round_number: 2 }).select("_id").lean();
+      if (!round2?._id) {
+        return NextResponse.json(
+          { error: "Round 2 not found. Create Round 2 first." },
+          { status: 400 },
+        );
+      }
+      const round2Id = (round2 as any)._id.toString();
+      const previouslyShortlisted = await Team.find({
+        rounds_accessible: round2Id,
+      })
+        .select("_id")
+        .lean();
+
+      const rounds = await Round.find({
+        round_number: { $in: [2, 3, 4] },
+      })
+        .select("_id round_number")
+        .lean();
+
+      const targetRoundIds = rounds.map((r: any) => r._id.toString());
+      await Team.updateMany(
+        { _id: { $in: teamIds } },
+        { $addToSet: { rounds_accessible: { $each: targetRoundIds } } },
+      );
+      await Team.updateMany(
+        { _id: { $nin: teamIds } },
+        { $pull: { rounds_accessible: { $in: targetRoundIds } } },
+      );
+
+      const shortlistedSet = new Set(teamIds.map((id) => id.toString()));
+      const removedTeamIds = previouslyShortlisted
+        .map((t: any) => t._id.toString())
+        .filter((id: string) => !shortlistedSet.has(id));
+
+      if (removedTeamIds.length > 0) {
+        const removedPairs = await Pairing.find({
+          round_anchor_id: round2Id,
+          $or: [
+            { team_a_id: { $in: removedTeamIds } },
+            { team_b_id: { $in: removedTeamIds } },
+          ],
+        })
+          .select("_id team_a_id team_b_id")
+          .lean();
+
+        if (removedPairs.length > 0) {
+          const affectedTeamIds = new Set<string>();
+          removedPairs.forEach((pair: any) => {
+            affectedTeamIds.add(pair.team_a_id.toString());
+            affectedTeamIds.add(pair.team_b_id.toString());
+          });
+
+          await Pairing.deleteMany({
+            _id: { $in: removedPairs.map((pair: any) => pair._id) },
+          });
+
+          const round3 = rounds.find((r: any) => r.round_number === 3);
+          if (round3 && affectedTeamIds.size > 0) {
+            await RoundOptions.updateMany(
+              {
+                round_id: (round3 as any)._id,
+                team_id: { $in: Array.from(affectedTeamIds) },
+              },
+              {
+                $set: {
+                  assignment_mode: "team",
+                  pair_id: null,
+                  priority_team_id: null,
+                  paired_team_id: null,
+                  published_at: null,
+                  auto_assigned: false,
+                  selected: null,
+                  selected_at: null,
+                },
+              },
+            );
+          }
+        }
+      }
+
+      return NextResponse.json({
+        message:
+          currentRoundNumber === 1
+            ? "Round 2 shortlist saved from Round 1 and mirrored to rounds 3 and 4 successfully"
+            : "Teams shortlisted and mirrored to rounds 3 and 4 successfully",
+        shortlisted_count: teamIds.length,
+        mirrored_rounds: [2, 3, 4],
+      });
+    }
+
     await Team.updateMany(
       { _id: { $in: teamIds } },
       { $addToSet: { rounds_accessible: roundId } },
     );
 
-    // Remove round from other teams' accessible rounds
     await Team.updateMany(
       { _id: { $nin: teamIds } },
       { $pull: { rounds_accessible: roundId } },

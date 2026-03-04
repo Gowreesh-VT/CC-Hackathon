@@ -21,6 +21,8 @@ import Submission from "@/models/Submission";
 // import Judge from "@/models/Judge";
 import "@/models/Track";
 import { proxy } from "@/lib/proxy";
+import { getEffectiveAccessibleRoundIds } from "@/lib/roundPolicy";
+import Pairing from "@/models/Pairing";
 
 export const dynamic = "force-dynamic";
 
@@ -38,24 +40,26 @@ async function GETHandler(request: NextRequest) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
-    const accessibleRoundIds = team.rounds_accessible.map(
-      (r: any) => r._id ?? r,
+    const allRounds = await Round.find({})
+      .select("_id round_number is_active start_time end_time instructions")
+      .sort({ round_number: 1 })
+      .lean();
+
+    const effectiveAccessibleRoundIds = getEffectiveAccessibleRoundIds(
+      team as any,
+      allRounds as any[],
     );
 
-    // Find the active round: for Round 1, show if active even if not yet in rounds_accessible
-    // For Round 2+, require explicit access (shortlisting)
-    let activeRound = await Round.findOne({
-      _id: { $in: accessibleRoundIds },
-      is_active: true,
-    });
-
-    // Fallback: if no accessible active round, check if Round 1 is globally active
-    if (!activeRound) {
-      const globalActiveRound = await Round.findOne({ is_active: true });
-      if (globalActiveRound && globalActiveRound.round_number === 1) {
-        activeRound = globalActiveRound;
-      }
-    }
+    // Prefer currently active accessible round; fallback to latest accessible round.
+    // This keeps dashboard consistent with the Rounds page visibility.
+    const accessibleRounds = allRounds.filter((r: any) =>
+      effectiveAccessibleRoundIds.has(r._id.toString()),
+    );
+    const activeAccessibleRound = accessibleRounds.find((r: any) => r.is_active);
+    const latestAccessibleRound = [...accessibleRounds].sort(
+      (a: any, b: any) => (b.round_number || 0) - (a.round_number || 0),
+    )[0];
+    const activeRound = activeAccessibleRound || latestAccessibleRound || null;
 
     // Fetch all submissions for this team (all rounds)
     const submissions = await Submission.find({
@@ -140,6 +144,30 @@ async function GETHandler(request: NextRequest) {
       }
     }
 
+    let pairInfo: { pair_id: string; pair_team_id: string; pair_team_name: string } | null = null;
+    const round2 = allRounds.find((r: any) => r.round_number === 2);
+    if (round2?._id) {
+      const pair = await Pairing.findOne({
+        round_anchor_id: round2._id,
+        $or: [{ team_a_id: teamId }, { team_b_id: teamId }],
+      })
+        .populate("team_a_id", "team_name")
+        .populate("team_b_id", "team_name")
+        .lean();
+
+      if (pair) {
+        const isTeamA = pair.team_a_id?._id?.toString() === teamId.toString();
+        const partnerTeam = isTeamA ? pair.team_b_id : pair.team_a_id;
+        if (partnerTeam?._id) {
+          pairInfo = {
+            pair_id: pair._id.toString(),
+            pair_team_id: partnerTeam._id.toString(),
+            pair_team_name: partnerTeam.team_name || "N/A",
+          };
+        }
+      }
+    }
+
     return NextResponse.json({
       team_name: team.team_name,
       track: (team.track_id as any)?.name || "N/A",
@@ -157,10 +185,11 @@ async function GETHandler(request: NextRequest) {
       current_round_subtask: currentRoundSubtask,
       current_round_submission: currentRoundSubmission,
       // current_round_remarks: currentRoundRemarks,
+      pair_info: pairInfo,
       // total_score: totalScore,
       // latest_round_score: latestRoundScore,
       // all_round_scores: allRoundScores,
-      rounds_accessible: accessibleRoundIds,
+      rounds_accessible: Array.from(effectiveAccessibleRoundIds),
     });
 
     // Caatch any errors

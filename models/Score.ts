@@ -3,7 +3,9 @@ import mongoose, { Schema, Document, models, model } from "mongoose";
 export interface IScore extends Document {
   judge_id: mongoose.Types.ObjectId;
   submission_id: mongoose.Types.ObjectId;
-  score: number;
+  score: number | null;
+  sec_score?: number;
+  faculty_score?: number;
   remarks: string;
   status: "pending" | "scored";
   created_at: Date;
@@ -17,7 +19,20 @@ const ScoreSchema = new Schema<IScore>({
     type: Number,
     min: 0,
     max: 100,
-    required: [true, "Score is required"],
+    required: false,
+    default: null,
+  },
+  sec_score: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null,
+  },
+  faculty_score: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null,
   },
   remarks: String,
   status: { type: String, enum: ["pending", "scored"], default: "pending" },

@@ -77,6 +77,9 @@ export default function JudgesPage() {
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [assignedTeamIds, setAssignedTeamIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+  const assignableTeams = selectedJudge?.track_id
+    ? allTeams.filter((team) => team.track_id === selectedJudge.track_id)
+    : allTeams;
 
   const loading = judgesLoading || teamsLoading;
 
@@ -90,7 +93,16 @@ export default function JudgesPage() {
 
   const openAssign = (judge: Judge) => {
     setSelectedJudge(judge);
-    setAssignedTeamIds(judge.teams_assigned?.map((t: any) => (typeof t === "string" ? t : t.id)) ?? []);
+    const currentAssigned =
+      judge.teams_assigned?.map((t: any) => (typeof t === "string" ? t : t.id)) ?? [];
+    const filteredAssigned = currentAssigned.filter((teamId: string) =>
+      allTeams.some(
+        (team) =>
+          team.id === teamId &&
+          (!judge.track_id || team.track_id === judge.track_id),
+      ),
+    );
+    setAssignedTeamIds(filteredAssigned);
     setAssignOpen(true);
   };
 
@@ -240,11 +252,16 @@ export default function JudgesPage() {
               Assign teams to {selectedJudge?.judge_name}
             </DialogTitle>
           </DialogHeader>
+          {selectedJudge?.track && (
+            <p className="text-sm text-muted-foreground">
+              Showing only teams from track: <span className="font-medium">{selectedJudge.track}</span>
+            </p>
+          )}
           <div className="space-y-2 py-4 max-h-[50vh] overflow-y-auto">
-            {allTeams.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No teams available.</p>
+            {assignableTeams.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No teams available in this track.</p>
             ) : (
-              allTeams.map((team) => {
+              assignableTeams.map((team) => {
                 const checked = assignedTeamIds.includes(team.id);
                 return (
                   <div

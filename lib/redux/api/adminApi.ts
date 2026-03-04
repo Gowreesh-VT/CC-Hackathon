@@ -8,6 +8,7 @@ import {
   Judge,
   Track,
   RoundTeamsResponse,
+  Pair,
 } from "./types";
 
 export const adminApi = baseApi.injectEndpoints({
@@ -94,7 +95,7 @@ export const adminApi = baseApi.injectEndpoints({
       ],
     }),
     updateRoundTeams: builder.mutation<
-      { message: string; shortlisted_count: number },
+      { message: string; shortlisted_count: number; mirrored_rounds?: number[] },
       { roundId: string; teamIds: string[] }
     >({
       query: ({ roundId, teamIds }) => ({
@@ -113,6 +114,66 @@ export const adminApi = baseApi.injectEndpoints({
     >({
       query: ({ roundId, allocations }) => ({
         url: `/admin/rounds/${roundId}/allocate`,
+        method: "POST",
+        body: { allocations },
+      }),
+      invalidatesTags: (result, error, { roundId }) => [
+        { type: "Round", id: roundId },
+        "Team",
+      ],
+    }),
+    getRoundPairs: builder.query<
+      {
+        paired: Pair[];
+        unpaired_by_track: Record<string, Array<{ id: string; team_name: string; track: string; track_id: string | null }>>;
+        shortlisted_count: number;
+        paired_count: number;
+        validation?: {
+          odd_shortlist_count: boolean;
+          unpaired_count: number;
+        };
+      },
+      string
+    >({
+      query: (roundId) => `/admin/rounds/${roundId}/pairs`,
+      providesTags: (result, error, roundId) => [
+        { type: "Round", id: roundId },
+        "Team",
+      ],
+    }),
+    createRoundPair: builder.mutation<
+      { message: string; pair_id: string },
+      { roundId: string; teamAId: string; teamBId: string }
+    >({
+      query: ({ roundId, teamAId, teamBId }) => ({
+        url: `/admin/rounds/${roundId}/pairs`,
+        method: "POST",
+        body: { teamAId, teamBId },
+      }),
+      invalidatesTags: (result, error, { roundId }) => [
+        { type: "Round", id: roundId },
+        "Team",
+      ],
+    }),
+    deleteRoundPair: builder.mutation<
+      { message: string },
+      { roundId: string; pairId: string }
+    >({
+      query: ({ roundId, pairId }) => ({
+        url: `/admin/rounds/${roundId}/pairs/${pairId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { roundId }) => [
+        { type: "Round", id: roundId },
+        "Team",
+      ],
+    }),
+    allocateSubtasksToPairs: builder.mutation<
+      { message: string; count: number },
+      { roundId: string; allocations: { pairId: string; subtaskIds: string[] }[] }
+    >({
+      query: ({ roundId, allocations }) => ({
+        url: `/admin/rounds/${roundId}/allocate-pairs`,
         method: "POST",
         body: { allocations },
       }),
@@ -348,6 +409,10 @@ export const {
   useGetRoundTeamsQuery,
   useUpdateRoundTeamsMutation,
   useAllocateSubtasksToTeamsMutation,
+  useGetRoundPairsQuery,
+  useCreateRoundPairMutation,
+  useDeleteRoundPairMutation,
+  useAllocateSubtasksToPairsMutation,
   useGetTracksQuery,
   useCreateTrackMutation,
   useUpdateTrackMutation,

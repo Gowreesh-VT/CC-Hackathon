@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
 import Judge from "@/models/Judge";
+import "@/models/Track";
 import Team from "@/models/Team";
 import Round from "@/models/Round";
 import Submission from "@/models/Submission";
@@ -18,6 +19,8 @@ async function GETHandler(request: NextRequest) {
   await connectDB();
 
   try {
+    // proxy() already verified authentication and the "judge" role.
+    // Retrieve email from the live session to look up the judge record.
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -43,9 +46,9 @@ async function GETHandler(request: NextRequest) {
 
     const assignedTeamIds = activeRound
       ? await getAssignedTeamIdsForJudgeRound(
-          judge._id.toString(),
-          activeRound._id.toString(),
-        )
+        judge._id.toString(),
+        activeRound._id.toString(),
+      )
       : await getAssignedTeamIdsForJudge(judge._id.toString());
 
     const assignedTeams = await Team.find({ _id: { $in: assignedTeamIds } })
@@ -128,12 +131,12 @@ async function GETHandler(request: NextRequest) {
       },
       active_round: activeRound
         ? {
-            id: activeRound._id.toString(),
-            round_number: activeRound.round_number,
-            is_active: activeRound.is_active,
-            start_time: activeRound.start_time,
-            end_time: activeRound.end_time,
-          }
+          id: activeRound._id.toString(),
+          round_number: activeRound.round_number,
+          is_active: activeRound.is_active,
+          start_time: activeRound.start_time,
+          end_time: activeRound.end_time,
+        }
         : null,
       statistics: {
         total_submissions: totalSubmissions,

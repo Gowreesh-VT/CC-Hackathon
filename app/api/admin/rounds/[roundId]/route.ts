@@ -4,6 +4,7 @@ import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import RoundOptions from "@/models/RoundOptions";
 import JudgeAssignment from "@/models/JudgeAssignment";
+import Pairing from "@/models/Pairing";
 import { proxy } from "@/lib/proxy";
 import { z } from "zod";
 
@@ -137,6 +138,7 @@ async function DELETEHandler(
     await Submission.deleteMany({ round_id: roundId });
     await RoundOptions.deleteMany({ round_id: roundId });
     await JudgeAssignment.deleteMany({ round_id: roundId });
+    await Pairing.deleteMany({ round_anchor_id: roundId });
 
     return NextResponse.json({
       message: "Round deleted successfully",

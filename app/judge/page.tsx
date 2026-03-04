@@ -16,6 +16,8 @@ type TeamAssignment = {
   team_name: string;
   status: "pending" | "scored";
   score?: number;
+  sec_score?: number | null;
+  faculty_score?: number | null;
 };
 
 export default function JudgeHomePage() {
@@ -173,7 +175,14 @@ export default function JudgeHomePage() {
                         <p className="font-medium">{team.team_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {team.status === "scored"
-                            ? `Scored: ${team.score ?? "—"}`
+                            ? team.score !== null && team.score !== undefined
+                              ? `Scored: ${team.score}`
+                              : team.sec_score !== null &&
+                                  team.sec_score !== undefined &&
+                                  team.faculty_score !== null &&
+                                  team.faculty_score !== undefined
+                                ? `SEC: ${team.sec_score} | Faculty: ${team.faculty_score}`
+                                : "Scored"
                             : "Awaiting evaluation"}
                         </p>
                       </div>

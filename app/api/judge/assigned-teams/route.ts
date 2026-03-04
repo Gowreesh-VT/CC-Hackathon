@@ -105,23 +105,50 @@ async function GETHandler(request: NextRequest) {
   const scores = await Score.find({
     judge_id: (judge as any)._id,
     submission_id: { $in: submissionIds },
-  }).lean();
+  })
+    .sort({ updated_at: -1 })
+    .lean();
 
-  // Build a set of team IDs that have been scored at least once
   const submissionToTeam = new Map(
     allSubmissions.map((s: any) => [s._id.toString(), s.team_id.toString()]),
   );
-  const scoredTeamIds = new Set(
-    scores.map((sc: any) =>
-      submissionToTeam.get(sc.submission_id.toString()),
-    ),
-  );
+  const latestScoreByTeam = new Map<
+    string,
+    {
+      score: number | null;
+      sec_score: number | null;
+      faculty_score: number | null;
+      updated_at: Date | null;
+    }
+  >();
+  const latestNumericScoreByTeam = new Map<string, number>();
+  scores.forEach((sc: any) => {
+    const teamId = submissionToTeam.get(sc.submission_id.toString());
+    if (!teamId) return;
+    if (!latestScoreByTeam.has(teamId)) {
+      latestScoreByTeam.set(teamId, {
+        score: sc.score ?? null,
+        sec_score: sc.sec_score ?? null,
+        faculty_score: sc.faculty_score ?? null,
+        updated_at: sc.updated_at ?? null,
+      });
+    }
+    if (sc.score !== null && sc.score !== undefined && !latestNumericScoreByTeam.has(teamId)) {
+      latestNumericScoreByTeam.set(teamId, sc.score);
+    }
+  });
 
   const result = teams.map((team: any) => ({
     team_id: team._id.toString(),
     team_name: team.team_name,
-    status: scoredTeamIds.has(team._id.toString()) ? "scored" : "pending",
-    score: null, // aggregate score not computed here
+    status: latestScoreByTeam.has(team._id.toString()) ? "scored" : "pending",
+    score:
+      latestNumericScoreByTeam.get(team._id.toString()) ??
+      latestScoreByTeam.get(team._id.toString())?.score ??
+      null,
+    sec_score: latestScoreByTeam.get(team._id.toString())?.sec_score ?? null,
+    faculty_score:
+      latestScoreByTeam.get(team._id.toString())?.faculty_score ?? null,
   }));
 
   return NextResponse.json(result);

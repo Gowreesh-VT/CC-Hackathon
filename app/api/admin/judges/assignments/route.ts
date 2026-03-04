@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/config/db";
 import Judge from "@/models/Judge";
 import JudgeAssignment from "@/models/JudgeAssignment";
+import Team from "@/models/Team";
 import { proxy } from "@/lib/proxy";
 
 // GET: Fetch all judge assignments
@@ -118,6 +119,18 @@ async function POSTHandler(request: NextRequest) {
     }
 
     const uniqueTeamIds = [...new Set(teamIds.map((id: string) => id.toString()))];
+    if (uniqueTeamIds.length > 0) {
+      const validCount = await Team.countDocuments({
+        _id: { $in: uniqueTeamIds },
+        track_id: judge.track_id,
+      });
+      if (validCount !== uniqueTeamIds.length) {
+        return NextResponse.json(
+          { error: "All assigned teams must belong to the judge's track" },
+          { status: 400 },
+        );
+      }
+    }
     await JudgeAssignment.findOneAndUpdate(
       { judge_id: judgeId, round_id: roundId },
       {

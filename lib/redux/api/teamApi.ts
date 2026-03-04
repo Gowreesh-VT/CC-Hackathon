@@ -1,12 +1,9 @@
 import { baseApi } from "./baseApi";
+import { PairSubmissionsResponse, TeamRoundDetails } from "./types";
 
 export const teamApi = baseApi.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
-    getTeamProfile: builder.query<any, void>({
-      query: () => "/team",
-      providesTags: ["Team"],
-    }),
     getTeamDashboard: builder.query<any, void>({
       query: () => "/team",
       providesTags: ["Team", "Round", "Submission"],
@@ -15,7 +12,7 @@ export const teamApi = baseApi.injectEndpoints({
       query: () => "/team/rounds",
       providesTags: ["Round"],
     }),
-    getTeamRoundDetails: builder.query<any, string>({
+    getTeamRoundDetails: builder.query<TeamRoundDetails, string>({
       query: (id) => `/team/rounds/${id}`,
       providesTags: (result, error, id) => [{ type: "Round", id }],
     }),
@@ -89,11 +86,14 @@ export const teamApi = baseApi.injectEndpoints({
       query: () => "/team/submission",
       providesTags: ["Submission"],
     }),
+    getPairSubmissions: builder.query<PairSubmissionsResponse, void>({
+      query: () => "/team/submission/pair",
+      providesTags: ["Submission"],
+    }),
   }),
 });
 
 export const {
-  useGetTeamProfileQuery,
   useGetTeamDashboardQuery,
   useGetTeamRoundsQuery,
   useGetTeamRoundDetailsQuery,
@@ -103,4 +103,5 @@ export const {
   useSubmitRoundSubmissionMutation,
   useUpdateRoundSubmissionMutation,
   useGetTeamSubmissionsQuery,
+  useGetPairSubmissionsQuery,
 } = teamApi;

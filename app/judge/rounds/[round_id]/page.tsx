@@ -39,6 +39,8 @@ type TeamEvaluation = {
   taskName: string;
   status: "pending" | "scored";
   score: number | null;
+  sec_score?: number | null;
+  faculty_score?: number | null;
   remarks: string;
   selected_subtask?: any;
   submission?: any;
@@ -55,8 +57,11 @@ export default function JudgeRoundDetailsPage() {
   const [evaluations, setEvaluations] = useState<TeamEvaluation[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [dialogScore, setDialogScore] = useState("");
+  const [dialogSecScore, setDialogSecScore] = useState("");
+  const [dialogFacultyScore, setDialogFacultyScore] = useState("");
   const [dialogRemarks, setDialogRemarks] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const isRound4 = roundInfo?.round_number === 4;
 
   const [submitScore] = useSubmitScoreMutation();
   const [updateScore] = useUpdateScoreMutation();
@@ -71,6 +76,8 @@ export default function JudgeRoundDetailsPage() {
           // score is nested: { score, remarks, status }
           status: (team.score?.status as "pending" | "scored") ?? "pending",
           score: team.score?.score ?? null,
+          sec_score: team.score?.sec_score ?? null,
+          faculty_score: team.score?.faculty_score ?? null,
           remarks: team.score?.remarks ?? "",
           selected_subtask: team.selected_subtask,
           submission: team.submission,
@@ -96,6 +103,8 @@ export default function JudgeRoundDetailsPage() {
     const evaluation = evaluations.find((e) => e.teamId === selectedTeamId);
     if (evaluation) {
       setDialogScore(evaluation.score?.toString() ?? "");
+      setDialogSecScore(evaluation.sec_score?.toString() ?? "");
+      setDialogFacultyScore(evaluation.faculty_score?.toString() ?? "");
       setDialogRemarks(evaluation.remarks ?? "");
     }
   }, [selectedTeamId, evaluations]);
@@ -107,24 +116,47 @@ export default function JudgeRoundDetailsPage() {
   const handleCloseDialog = () => {
     setSelectedTeamId(null);
     setDialogScore("");
+    setDialogSecScore("");
+    setDialogFacultyScore("");
     setDialogRemarks("");
   };
 
-  const handleScoreChange = (value: string) => {
+  const isValidScoreInput = (value: string) => {
     // Allow only 0-100 range
-    if (
+    return (
       value === "" ||
       (/^\d+$/.test(value) && parseInt(value) >= 0 && parseInt(value) <= 100)
-    ) {
-      setDialogScore(value);
-    }
+    );
+  };
+
+  const handleScoreChange = (value: string) => {
+    if (isValidScoreInput(value)) setDialogScore(value);
   };
 
   const handleSaveEvaluation = async () => {
     if (!selectedTeamId) return;
-    const score = dialogScore === "" ? 0 : parseInt(dialogScore);
-    if (score < 0 || score > 100) {
+    if (!selectedTeam?.submission) {
+      toast.error("Cannot score: team has not submitted for this round");
+      return;
+    }
+    if (!isRound4 && dialogScore === "") {
+      toast.error("Score is required");
+      return;
+    }
+    if (isRound4 && (dialogSecScore === "" || dialogFacultyScore === "")) {
+      toast.error("Both SEC and Faculty scores are required");
+      return;
+    }
+
+    const score = parseInt(dialogScore);
+    const secScore = parseInt(dialogSecScore);
+    const facultyScore = parseInt(dialogFacultyScore);
+    if (!isRound4 && (score < 0 || score > 100)) {
       toast.error("Please enter a valid score (0-100)");
+      return;
+    }
+    if (isRound4 && (secScore < 0 || secScore > 100 || facultyScore < 0 || facultyScore > 100)) {
+      toast.error("Please enter valid SEC/Faculty scores (0-100)");
       return;
     }
 
@@ -136,14 +168,18 @@ export default function JudgeRoundDetailsPage() {
         await updateScore({
           roundId,
           teamId: selectedTeamId,
-          score,
+          ...(isRound4
+            ? { sec_score: secScore, faculty_score: facultyScore }
+            : { score }),
           remarks: dialogRemarks,
         }).unwrap();
       } else {
         await submitScore({
           roundId,
           teamId: selectedTeamId,
-          score,
+          ...(isRound4
+            ? { sec_score: secScore, faculty_score: facultyScore }
+            : { score }),
           remarks: dialogRemarks,
         }).unwrap();
       }
@@ -151,15 +187,28 @@ export default function JudgeRoundDetailsPage() {
       setEvaluations((prev) =>
         prev.map((e) =>
           e.teamId === selectedTeamId
-            ? { ...e, score, remarks: dialogRemarks, status: "scored" }
+            ? {
+                ...e,
+                score: isRound4 ? null : score,
+                sec_score: isRound4 ? secScore : e.sec_score,
+                faculty_score: isRound4 ? facultyScore : e.faculty_score,
+                remarks: dialogRemarks,
+                status: "scored",
+              }
             : e,
         ),
       );
 
       toast.success("Evaluation saved");
       setSelectedTeamId(null);
-    } catch {
-      toast.error("Failed to save evaluation");
+    } catch (error: any) {
+      const apiError =
+        error?.data?.error ||
+        error?.error ||
+        "Failed to save evaluation";
+      toast.error(
+        Array.isArray(apiError) ? apiError.join(", ") : String(apiError),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -233,7 +282,14 @@ export default function JudgeRoundDetailsPage() {
                   <TableHead>Team</TableHead>
                   <TableHead>Task</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
+                  {isRound4 ? (
+                    <>
+                      <TableHead>SEC Score</TableHead>
+                      <TableHead>Faculty Score</TableHead>
+                    </>
+                  ) : (
+                    <TableHead>Score</TableHead>
+                  )}
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -251,9 +307,10 @@ export default function JudgeRoundDetailsPage() {
                         <TableCell>
                           <Skeleton className="h-5 w-20 rounded-full" />
                         </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-12" />
-                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        {isRound4 && (
+                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        )}
                         <TableCell className="text-right">
                           <Skeleton className="h-8 w-24 ml-auto" />
                         </TableCell>
@@ -274,9 +331,25 @@ export default function JudgeRoundDetailsPage() {
                             {e.status === "scored" ? "Scored" : "Pending"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {e.score !== null ? `${e.score}/100` : "-"}
-                        </TableCell>
+                        {isRound4 ? (
+                          <>
+                            <TableCell>
+                              {e.sec_score !== null && e.sec_score !== undefined
+                                ? `${e.sec_score}/100`
+                                : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {e.faculty_score !== null &&
+                              e.faculty_score !== undefined
+                                ? `${e.faculty_score}/100`
+                                : "-"}
+                            </TableCell>
+                          </>
+                        ) : (
+                          <TableCell>
+                            {e.score !== null ? `${e.score}/100` : "-"}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <Button
                             size="sm"
@@ -312,10 +385,20 @@ export default function JudgeRoundDetailsPage() {
                 >
                   {selectedTeam?.status === "scored" ? "Scored" : "Pending"}
                 </Badge>
-                {selectedTeam?.score !== null && (
+                {!isRound4 && selectedTeam?.score !== null && (
                   <Badge variant="outline" className="text-xs">
                     Current: {selectedTeam?.score}/100
                   </Badge>
+                )}
+                {isRound4 && (
+                  <>
+                    <Badge variant="outline" className="text-xs">
+                      SEC: {selectedTeam?.sec_score ?? "-"}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      Faculty: {selectedTeam?.faculty_score ?? "-"}
+                    </Badge>
+                  </>
                 )}
               </div>
             </div>
@@ -386,27 +469,70 @@ export default function JudgeRoundDetailsPage() {
                 </div>
               ) : (
                 <p className="mt-2 text-sm italic text-muted-foreground">
-                  Team has not submitted yet. You can still record a score.
+                  Team has not submitted yet. Scoring is available only after submission.
                 </p>
               )}
             </div>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Score <span className="text-red-500">*</span>
-                  <span className="ml-2 text-xs text-muted-foreground">(0-100)</span>
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={dialogScore}
-                  onChange={(e) => handleScoreChange(e.target.value)}
-                  placeholder="Enter score"
-                  className="h-11 w-full text-base"
-                />
-              </div>
+              {isRound4 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      SEC Score <span className="text-red-500">*</span>
+                      <span className="ml-2 text-xs text-muted-foreground">(0-100)</span>
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={dialogSecScore}
+                      onChange={(e) => {
+                        if (isValidScoreInput(e.target.value)) {
+                          setDialogSecScore(e.target.value);
+                        }
+                      }}
+                      placeholder="Enter SEC score"
+                      className="h-11 w-full text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Faculty Score <span className="text-red-500">*</span>
+                      <span className="ml-2 text-xs text-muted-foreground">(0-100)</span>
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={dialogFacultyScore}
+                      onChange={(e) => {
+                        if (isValidScoreInput(e.target.value)) {
+                          setDialogFacultyScore(e.target.value);
+                        }
+                      }}
+                      placeholder="Enter Faculty score"
+                      className="h-11 w-full text-base"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Score <span className="text-red-500">*</span>
+                    <span className="ml-2 text-xs text-muted-foreground">(0-100)</span>
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={dialogScore}
+                    onChange={(e) => handleScoreChange(e.target.value)}
+                    placeholder="Enter score"
+                    className="h-11 w-full text-base"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">
@@ -427,7 +553,7 @@ export default function JudgeRoundDetailsPage() {
             <Button variant="outline" onClick={() => setSelectedTeamId(null)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEvaluation} disabled={isSaving}>
+            <Button onClick={handleSaveEvaluation} disabled={isSaving || !selectedTeam?.submission}>
               {isSaving && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}

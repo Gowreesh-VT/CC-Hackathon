@@ -15,6 +15,7 @@ import Round from "@/models/Round";
 import RoundOptions from "@/models/RoundOptions";
 import Submission from "@/models/Submission";
 import { proxy } from "@/lib/proxy";
+import { getEffectiveAccessibleRoundIds } from "@/lib/roundPolicy";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +35,7 @@ export async function GEThandler(request: NextRequest) {
     // Get all rounds and filter based on strict accessibility rules
     const allRounds = await Round.find({}).sort({ round_number: 1 });
 
-    // Convert ObjectIds to strings for comparison
-    const accessibleRoundIds = new Set(
-      (team.rounds_accessible || []).map((id: any) => id.toString()),
-    );
+    const accessibleRoundIds = getEffectiveAccessibleRoundIds(team, allRounds as any[]);
 
     const rounds = allRounds.filter((r) => {
       // Round 1: Open if active OR explicitly accessible
