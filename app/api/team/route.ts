@@ -17,8 +17,8 @@ import Round from "@/models/Round";
 import RoundOptions from "@/models/RoundOptions";
 import "@/models/Subtask";
 import Submission from "@/models/Submission";
-import Score from "@/models/Score";
-import Judge from "@/models/Judge";
+// import Score from "@/models/Score";
+// import Judge from "@/models/Judge";
 import "@/models/Track";
 import { proxy } from "@/lib/proxy";
 import { getEffectiveAccessibleRoundIds } from "@/lib/roundPolicy";
@@ -101,11 +101,11 @@ async function GETHandler(request: NextRequest) {
 
     // Fetch current round submission
     let currentRoundSubmission = null;
-    let currentRoundRemarks: Array<{
-      judge_name: string;
-      remark: string;
-      updated_at: Date | null;
-    }> = [];
+    // let currentRoundRemarks: Array<{
+    //   judge_name: string;
+    //   remark: string;
+    //   updated_at: Date | null;
+    // }> = [];
     if (activeRound) {
       const submission = await Submission.findOne({
         team_id: teamId,
@@ -121,25 +121,26 @@ async function GETHandler(request: NextRequest) {
           submitted_at: submission.submitted_at,
         };
 
-        const remarkScores = await Score.find({
-          submission_id: submission._id,
-          remarks: { $exists: true, $ne: "" },
-        })
-          .sort({ updated_at: -1 })
-          .populate({
-            path: "judge_id",
-            model: Judge,
-            select: "judge_name",
-          })
-          .lean();
+        // Remarks
+        // const remarkScores = await Score.find({
+        //   submission_id: submission._id,
+        //   remarks: { $exists: true, $ne: "" },
+        // })
+        //   .sort({ updated_at: -1 })
+        //   .populate({
+        //     path: "judge_id",
+        //     model: Judge,
+        //     select: "judge_name",
+        //   })
+        //   .lean();
 
-        currentRoundRemarks = remarkScores
-          .map((scoreDoc: any) => ({
-            judge_name: (scoreDoc.judge_id as any)?.judge_name || "Judge",
-            remark: scoreDoc.remarks,
-            updated_at: scoreDoc.updated_at || null,
-          }))
-          .filter((entry) => !!entry.remark);
+        // currentRoundRemarks = remarkScores
+        //   .map((scoreDoc: any) => ({
+        //     judge_name: (scoreDoc.judge_id as any)?.judge_name || "Judge",
+        //     remark: scoreDoc.remarks,
+        //     updated_at: scoreDoc.updated_at || null,
+        //   }))
+        //   .filter((entry) => !!entry.remark);
       }
     }
 
@@ -173,17 +174,17 @@ async function GETHandler(request: NextRequest) {
       track_id: (team.track_id as any)?._id?.toString() || null,
       current_round: activeRound
         ? {
-            _id: activeRound._id,
-            round_number: activeRound.round_number,
-            start_time: activeRound.start_time,
-            end_time: activeRound.end_time,
-            is_active: activeRound.is_active,
-            instructions: activeRound.instructions,
-          }
+          _id: activeRound._id,
+          round_number: activeRound.round_number,
+          start_time: activeRound.start_time,
+          end_time: activeRound.end_time,
+          is_active: activeRound.is_active,
+          instructions: activeRound.instructions,
+        }
         : null,
       current_round_subtask: currentRoundSubtask,
       current_round_submission: currentRoundSubmission,
-      current_round_remarks: currentRoundRemarks,
+      // current_round_remarks: currentRoundRemarks,
       pair_info: pairInfo,
       // total_score: totalScore,
       // latest_round_score: latestRoundScore,
