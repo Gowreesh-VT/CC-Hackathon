@@ -4,6 +4,7 @@ import Team from "@/models/Team";
 import Round from "@/models/Round";
 import Submission from "@/models/Submission";
 import Score from "@/models/Score";
+import Track from "@/models/Track";
 import { proxy } from "@/lib/proxy";
 
 async function GETHandler() {
